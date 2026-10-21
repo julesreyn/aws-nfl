@@ -725,6 +725,7 @@ function createView3D(
   let preset: CameraPreset = "free";
   let ghostOn = false;
   let snapCam = true;
+  let firstRep = true;
   let bubblesOn = false;
   let routesOn = false;
   let misalignOn = false;
@@ -966,6 +967,9 @@ function createView3D(
     if (selected && !players.has(String(selected))) selected = null;
     buildTrail();
     snapCam = true;
+    // Recentre la vue libre sur l'action du nouvel essai (sinon la caméra reste au milieu du terrain).
+    if (preset === "free") recenterFree(firstRep);
+    firstRep = false;
     lastFrame = frame = clamp(frame, 0, nFrames - 1);
     update(0);
   }
@@ -1463,6 +1467,22 @@ function createView3D(
     return n ? { x: sx / n, y: sy / n } : { x: losX, y: FIELD_W / 2 };
   }
 
+  // Recentre la caméra Libre sur l'action en conservant l'angle/la distance choisis par l'utilisateur.
+  // reset=true force une belle vue d'ensemble (3/4) centrée sur l'action.
+  function recenterFree(reset = false) {
+    const center = new THREE.Vector3(losX, 0, -ballSnapY);
+    if (reset) {
+      controls.target.copy(center);
+      camera.position.set(losX, 46, -ballSnapY + 42);
+    } else {
+      // translate la paire (caméra, cible) pour amener la cible sur le centre de l'action
+      const offset = camera.position.clone().sub(controls.target);
+      controls.target.copy(center);
+      camera.position.copy(center).add(offset);
+    }
+    controls.update();
+  }
+
   // ------------------------------------------------------------ boucle
   const clock = new THREE.Clock();
   let raf = 0;
@@ -1592,15 +1612,9 @@ function createView3D(
     const valid: CameraPreset[] = ["top", "qb", "line", "receiver", "free", "madden"];
     const next: CameraPreset = valid.includes(p) ? p : "top";
     if (next === "free") {
-      // Reprend la main en mode libre: cible = centre de l'action, recule si trop près du sol.
-      const act = actionCenter();
-      controls.target.set(act.x, 0, -act.y);
+      // Reprend la main en mode libre: recentre sur l'action, reset si vue trop rase/proche.
       const d = camera.position.distanceTo(controls.target);
-      if (d < 18 || camera.position.y < 8) {
-        // vue d'ensemble 3/4 agréable
-        camera.position.set(act.x, 46, -act.y + 42);
-      }
-      controls.update();
+      recenterFree(d < 18 || camera.position.y < 8);
     }
     if (next === "madden") {
       maddenX = actionCenter().x;
