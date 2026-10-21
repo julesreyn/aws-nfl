@@ -1,0 +1,185 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ------------------------------------------------------------------ design tokens */
+:root {
+  --radius: 0.7rem;
+
+  /* Accents — sobres, désaturés, utilisés avec parcimonie */
+  --ours: #e5484d;
+  --ours-soft: #ff7b7e;
+  --them: #6b7280;
+  --accent: #e8c56a;        /* ambre feutré (ex-jaune vif) */
+  --accent-ink: #171310;
+  --los: #7aa2c4;           /* bleu-gris discret */
+  --first-down: #e8c56a;
+  --grade-green: #4ec08a;
+  --grade-orange: #d9a441;
+  --grade-red: #e5695f;
+
+  /* Surfaces — noir / gris neutre (zinc), zéro teinte bleue */
+  --background: #0a0a0b;
+  --foreground: #ededef;
+  --card: #141416;
+  --card-foreground: #ededef;
+  --popover: #18181b;
+  --popover-foreground: #ededef;
+  --primary: #e8c56a;
+  --primary-foreground: #171310;
+  --secondary: #1c1c1f;
+  --secondary-foreground: #d4d4d8;
+  --muted: #19191c;
+  --muted-foreground: #8a8a92;
+  --accent-bg: #242428;
+  --accent-foreground: #ededef;
+  --destructive: #e5695f;
+  --border: #262629;
+  --input: #262629;
+  --ring: #3f3f46;
+
+  --font-display: "Barlow Condensed", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-bg);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-ours: var(--ours);
+  --color-them: var(--them);
+  --color-brand-accent: var(--accent);
+  --color-los: var(--los);
+  --color-grade-green: var(--grade-green);
+  --color-grade-orange: var(--grade-orange);
+  --color-grade-red: var(--grade-red);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* premium scrollbar */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--border) 85%, white 8%);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  background-clip: padding-box;
+}
+
+@layer utilities {
+  /* Glass réservé aux surfaces flottantes (topbar, overlays terrain). */
+  .glass {
+    background: color-mix(in oklab, var(--card) 80%, transparent);
+    backdrop-filter: blur(12px) saturate(1.15);
+    -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  }
+  /* Surface opaque — hiérarchie par bordure/fond, sans ombre. */
+  .card-elev {
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  /* Ombre neutre discrète, réservée aux surfaces flottantes (popover, toast, modal). */
+  .elev-pop {
+    box-shadow: 0 8px 24px -14px rgba(0, 0, 0, 0.7);
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+  /* Micro-label uniforme (FORMATION, COUVERTURE, GROUPE…). */
+  .label-xs {
+    font-size: 10.5px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  /* Transition de survol unique partout. */
+  .hover-smooth {
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      box-shadow 140ms ease,
+      transform 140ms ease;
+  }
+}
+
+/* Focus clavier cohérent sur tous les éléments interactifs. */
+:where(button, a, select, input, [role="tab"], [tabindex]):focus-visible {
+  outline: none;
+  outline: 1.5px solid var(--muted-foreground);
+  outline-offset: 2px;
+  box-shadow: none;
+  border-radius: var(--radius-md);
+}
+
+/* grade helpers */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.g-green { color: var(--grade-green); }
+.g-orange { color: var(--grade-orange); }
+.g-red { color: var(--grade-red); }
+.bg-g-green { background: var(--grade-green); }
+.bg-g-orange { background: var(--grade-orange); }
+.bg-g-red { background: var(--grade-red); }
