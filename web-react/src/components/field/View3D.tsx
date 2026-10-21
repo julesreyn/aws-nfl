@@ -459,17 +459,32 @@ function createView3D(
   scene.fog = new THREE.Fog(0x111a2c, 110, 260);
 
   const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 600);
-  camera.position.set(50, 60, 20);
-  const camTarget = new THREE.Vector3(60, 0, -FIELD_W / 2);
+  // Vue d'ensemble du terrain par défaut (3/4 en légère plongée), pas de zoom serré.
+  camera.position.set(FIELD_L / 2, 55, 48);
+  const camTarget = new THREE.Vector3(FIELD_L / 2, 0, -FIELD_W / 2);
   camera.lookAt(camTarget);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.maxPolarAngle = Math.PI * 0.49;
-  controls.minDistance = 4;
-  controls.maxDistance = 160;
-  controls.enabled = false;
+  controls.maxPolarAngle = Math.PI * 0.49; // interdit de passer sous le terrain
+  controls.minDistance = 6;
+  controls.maxDistance = 240;
+  controls.enablePan = true;
+  controls.screenSpacePanning = false; // pan dans le plan du terrain (comme Google Maps)
+  controls.panSpeed = 0.9;
+  controls.rotateSpeed = 0.85;
+  controls.zoomToCursor = true; // zoom vers le curseur
+  controls.target.copy(camTarget);
+  // Souris : glisser = rotation (inclinaison), clic droit = déplacement, molette = zoom.
+  controls.mouseButtons = {
+    LEFT: THREE.MOUSE.ROTATE,
+    MIDDLE: THREE.MOUSE.DOLLY,
+    RIGHT: THREE.MOUSE.PAN,
+  };
+  // Tactile : 1 doigt = rotation, 2 doigts = zoom + déplacement.
+  controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+  controls.enabled = true;
 
   // --- lumières (ambiance stade de nuit)
   scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x1f3a1c, 0.75));
@@ -707,7 +722,7 @@ function createView3D(
   let losX = 60,
     ballSnapY = FIELD_W / 2;
   let selected: string | null = null;
-  let preset: CameraPreset = "top";
+  let preset: CameraPreset = "free";
   let ghostOn = false;
   let snapCam = true;
   let bubblesOn = false;
@@ -1576,7 +1591,17 @@ function createView3D(
   function setCamera(p: CameraPreset) {
     const valid: CameraPreset[] = ["top", "qb", "line", "receiver", "free", "madden"];
     const next: CameraPreset = valid.includes(p) ? p : "top";
-    if (next === "free") controls.target.copy(camTarget);
+    if (next === "free") {
+      // Reprend la main en mode libre: cible = centre de l'action, recule si trop près du sol.
+      const act = actionCenter();
+      controls.target.set(act.x, 0, -act.y);
+      const d = camera.position.distanceTo(controls.target);
+      if (d < 18 || camera.position.y < 8) {
+        // vue d'ensemble 3/4 agréable
+        camera.position.set(act.x, 46, -act.y + 42);
+      }
+      controls.update();
+    }
     if (next === "madden") {
       maddenX = actionCenter().x;
       snapCam = true;

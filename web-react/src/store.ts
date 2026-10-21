@@ -93,7 +93,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   dim: "2d",
   view: "seance",
-  camera: "top",
+  camera: "free",
   toggles: { ghost: false, bubbles: false, routes: false, misalign: false },
   routes: [],
 

@@ -5,12 +5,12 @@ import { Segmented } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
 
 const CAMERA_OPTIONS: { value: CameraPreset; label: string; title?: string }[] = [
+  { value: "free", label: "🖐 Libre", title: "Contrôle libre : glisser pour tourner/incliner, molette pour zoomer, clic droit pour déplacer" },
   { value: "top", label: "🚁 Drone", title: "Vue du dessus (drone)" },
   { value: "madden", label: "🎮 Madden", title: "Caméra diffusion" },
   { value: "qb", label: "QB", title: "Caméra quarterback" },
   { value: "line", label: "Ligne", title: "Caméra ligne de scrimmage" },
   { value: "receiver", label: "Receveur", title: "Caméra receveur" },
-  { value: "free", label: "Libre", title: "Caméra libre (orbite)" },
 ];
 
 const TOGGLE_CHIPS: { key: keyof ViewToggles; label: string; title: string }[] = [
