@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sideline · Retour d'entraînement</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23163a2a'/%3E%3Crect x='6' y='6' width='4' height='20' rx='1' fill='%23f2d14b'/%3E%3Crect x='14' y='6' width='2' height='20' fill='%23e9efe9' opacity='.5'/%3E%3Crect x='20' y='6' width='2' height='20' fill='%23e9efe9' opacity='.5'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/view3d.css">
+  <link rel="stylesheet" href="css/reports.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" title="Sideline — retour individuel après chaque essai">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-name">Sideline</span>
+    </div>
+
+    <label class="session-pick">
+      <span class="sr-only">Séance</span>
+      <select id="sessionSelect" aria-label="Choisir la séance"></select>
+    </label>
+
+    <div class="seg" role="tablist" aria-label="Vue">
+      <button class="seg-btn is-on" data-view="seance" role="tab" aria-selected="true">Séance</button>
+      <button class="seg-btn" data-view="rapports" role="tab" aria-selected="false">Rapports</button>
+    </div>
+
+    <div class="topbar-right">
+      <button id="liveBtn" class="live-btn" title="Enchaîne les essais du drill et envoie les retours aux joueurs">
+        <span class="live-dot" aria-hidden="true"></span><span class="live-txt">Séance en direct</span>
+      </button>
+      <button id="settingsBtn" class="icon-btn" aria-label="Réglages des retours" title="Réglages des retours">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 6h11.2a3 3 0 0 1 5.6 0H21v2h-1.2a3 3 0 0 1-5.6 0H3V6Zm14 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM3 16h3.2a3 3 0 0 1 5.6 0H21v2h-9.2a3 3 0 0 1-5.6 0H3v-2Zm6 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg>
+      </button>
+      <div id="settingsPop" class="popover" hidden></div>
+    </div>
+  </header>
+
+  <section id="seanceView" class="seance">
+    <div id="sessionTimeline" class="stl" aria-label="Timeline de la séance"></div>
+
+    <main class="stage">
+      <div class="field-wrap">
+        <div id="field2d" class="field-host"></div>
+        <div id="field3d" class="field-host" hidden></div>
+
+        <div class="field-tools">
+          <div class="seg seg-sm" aria-label="Vue du terrain">
+            <button class="seg-btn is-on" data-dim="2d">2D</button>
+            <button class="seg-btn" data-dim="3d">3D</button>
+          </div>
+          <div id="camTools" class="cam-tools" hidden>
+            <div class="seg seg-sm" aria-label="Caméra">
+              <button class="seg-btn is-on" data-cam="top">Dessus</button>
+              <button class="seg-btn" data-cam="qb">QB</button>
+              <button class="seg-btn" data-cam="line">Ligne</button>
+              <button class="seg-btn" data-cam="receiver">Receveur</button>
+              <button class="seg-btn" data-cam="free">Libre</button>
+            </div>
+            <button id="ghostBtn" class="chip-btn" aria-pressed="false" title="Affiche le placement attendu en transparence">Fantôme</button>
+          </div>
+        </div>
+
+        <div id="repBadge" class="rep-badge"></div>
+        <div id="liveBanner" class="live-banner" hidden></div>
+        <div id="help" class="help" hidden></div>
+      </div>
+
+      <div id="playTimeline" class="ptl"></div>
+    </main>
+
+    <aside id="panel" class="panel" aria-label="Détails de l'essai"></aside>
+  </section>
+
+  <section id="reportsView" class="reports-host" hidden></section>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <div id="modalRoot"></div>
+  <div id="tooltip" class="tooltip" hidden></div>
+  <div id="boot" class="boot"><div class="boot-in"><span class="brand-mark big" aria-hidden="true"><i></i><i></i><i></i></span><p>Chargement de la séance…</p></div></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
