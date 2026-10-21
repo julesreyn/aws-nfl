@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
 import { useStore } from "@/store";
 import type {
   CameraPreset,
@@ -463,6 +465,59 @@ function createView3D(
   camera.position.set(FIELD_L / 2, 55, 48);
   const camTarget = new THREE.Vector3(FIELD_L / 2, 0, -FIELD_W / 2);
   camera.lookAt(camTarget);
+
+  // --- Drone : modèle OBJ rouge survolant l'action + caméra picture-in-picture ("Vue du drone")
+  const droneCam = new THREE.PerspectiveCamera(50, 1.6, 0.1, 400);
+  let droneOn = true;
+  const droneBox = document.createElement("div");
+  droneBox.className = "v3d-drone";
+  droneBox.innerHTML = '<span class="v3d-drone-tag"><i></i>Vue du drone</span>';
+  droneBox.hidden = true;
+  root.appendChild(droneBox);
+  let droneMesh: THREE.Object3D | null = null;
+  let droneBeam: THREE.Mesh | null = null;
+  new MTLLoader()
+    .setPath("models/Drone/")
+    .loadAsync("Drone.mtl")
+    .then((mtl) => {
+      mtl.preload();
+      return new OBJLoader().setMaterials(mtl).setPath("models/Drone/").loadAsync("Drone.obj");
+    })
+    .then((obj) => {
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const k = 6 / Math.max(size.x, size.z, 0.001);
+      obj.scale.setScalar(k);
+      const c = box.getCenter(new THREE.Vector3());
+      obj.position.set(-c.x * k, -c.y * k, -c.z * k);
+      obj.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.isMesh) {
+          mesh.castShadow = true;
+          const mat = mesh.material as THREE.MeshStandardMaterial;
+          if (mat) {
+            mat.emissive = new THREE.Color(0x8a0f0f);
+            mat.emissiveIntensity = 0.25;
+          }
+        }
+      });
+      droneMesh = new THREE.Group();
+      droneMesh.add(obj);
+      // faisceau caméra du drone
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.15, 3.2, 1, 16, 1, true),
+        new THREE.MeshBasicMaterial({
+          color: 0xff5b52,
+          transparent: true,
+          opacity: 0.08,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        })
+      );
+      droneBeam = beam;
+      scene.add(droneMesh, beam);
+    })
+    .catch((e) => console.warn("modèle drone indisponible", e));
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -1518,6 +1573,55 @@ function createView3D(
     sun.position.set(losX - 25, 70, 25);
     fadeSprites();
     renderer.render(scene, camera);
+
+    // --- drone : survol animé de l'action
+    if (droneMesh) {
+      const dh = 9 + Math.sin(t * 0.8) * 0.6;
+      droneMesh.position.set(
+        losX + 1 + Math.sin(t * 0.25) * 1.2,
+        dh,
+        -(ballSnapY + 5) + Math.sin(t * 0.4) * 1
+      );
+      droneMesh.rotation.set(
+        Math.sin(t * 0.7) * 0.05,
+        Math.PI / 2 + Math.sin(t * 0.3) * 0.15,
+        Math.cos(t * 0.6) * 0.05
+      );
+      if (droneBeam) {
+        droneBeam.scale.set(1, dh - 0.3, 1);
+        droneBeam.position.set(droneMesh.position.x, (dh - 0.3) / 2, droneMesh.position.z);
+        (droneBeam.material as THREE.MeshBasicMaterial).opacity = 0.07 + Math.sin(t * 2) * 0.025;
+      }
+    }
+
+    // --- encart "Vue du drone" (picture-in-picture en haut à droite)
+    const vw = renderer.domElement.clientWidth;
+    const vh = renderer.domElement.clientHeight;
+    if (droneOn && vw > 360) {
+      const dw = Math.round(Math.min(230, vw * 0.24));
+      const dhp = Math.round(dw / 1.6);
+      const hover = Math.sin(t * 0.8) * 0.6;
+      droneCam.aspect = dw / dhp;
+      droneCam.updateProjectionMatrix();
+      droneCam.position.set(losX + 8 + Math.sin(t * 0.25) * 2, 42 + hover, -FIELD_W / 2 + 14);
+      droneCam.lookAt(losX + 8, 0, -FIELD_W / 2);
+      const pr = renderer.getPixelRatio();
+      const sx = (vw - dw - 10) * pr;
+      const sy = (vh - dhp - 44) * pr; // origine bas-gauche, encart en haut à droite sous la barre
+      renderer.setScissorTest(true);
+      renderer.setViewport(sx, sy, dw * pr, dhp * pr);
+      renderer.setScissor(sx, sy, dw * pr, dhp * pr);
+      if (droneMesh) droneMesh.visible = false; // ne pas voir le drone depuis lui-même
+      renderer.render(scene, droneCam);
+      if (droneMesh) droneMesh.visible = true;
+      renderer.setScissorTest(false);
+      renderer.setViewport(0, 0, vw * pr, vh * pr);
+      droneBox.style.width = dw + "px";
+      droneBox.style.height = dhp + "px";
+      droneBox.hidden = false;
+    } else {
+      droneBox.hidden = true;
+    }
   }
 
   // ------------------------------------------------------------ interactions
