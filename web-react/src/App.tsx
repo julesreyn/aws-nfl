@@ -9,6 +9,7 @@ import { PlayTimeline } from "@/components/chrome/PlayTimeline";
 import { Field3DControls } from "@/components/chrome/Field3DControls";
 import { Field2D } from "@/components/field/Field2D";
 import { View3D } from "@/components/field/View3D";
+import { RoutesPanel } from "@/components/field/RoutesPanel";
 import { RepPanel } from "@/components/panel/RepPanel";
 import { PhonePanel } from "@/components/panel/PhonePanel";
 import { SettingsMenu } from "@/components/panel/Settings";
@@ -170,6 +171,7 @@ export default function App() {
 
                 {/* 3D controls cluster (top-right / self positioned) */}
                 <Field3DControls />
+                <RoutesPanel />
 
                 {rep && (
                   <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-10 flex items-center gap-2">
