@@ -5,6 +5,7 @@ import { createPanel } from './panel.js';
 import { openBriefPreview } from './briefs.js';
 import * as tts from './tts.js';
 import * as settings from './settings.js';
+import { analyzeRep } from './analysis.js';
 
 const $ = s => document.querySelector(s);
 const FPS = 10;
@@ -12,7 +13,7 @@ const FPS = 10;
 const state = {
   sessions: [], session: null, tracking: null, repsById: {}, drillsById: {},
   rep: null, frame: 0, playing: false, speed: 1, selected: null,
-  dim: '2d', view: 'seance', live: null, // live: { drillId, step }
+  dim: '3d', voice: true, ana: null, view: 'seance', live: null, // live: { drillId, step }
 };
 
 // ---------- UI helpers ----------
@@ -78,6 +79,7 @@ async function boot() {
   if (!sid) { showFatal('Aucune séance disponible.', 'Le fichier sessions.json est vide.'); return; }
   sel.value = sid;
   await loadSession(sid, hash.get('r'));
+  await setDim('3d');
   $('#boot').classList.add('is-done');
   setTimeout(() => $('#boot').remove(), 500);
   maybeHelp();
@@ -125,6 +127,8 @@ function openRep(repId, { autoplay = false } = {}) {
   panel.setSelected(state.selected);
   sessionTL.setActive(rep.id);
   renderBadge();
+  state.ana = analyzeRep(rep, track, state.session);
+  renderRouteCard();
   setFrame(0);
   history.replaceState(null, '', `#s=${state.session.id}&r=${rep.id}`);
   if (autoplay) play(); else pause();
@@ -149,6 +153,7 @@ function setFrame(f) {
 function play() {
   if (!state.rep) return;
   if (state.frame >= state.rep.nFrames - 1.001) setFrame(0);
+  if (state.frame < 1 && state.voice && state.ana?.speech && !tts.speaking()) announceRoutes();
   state.playing = true; playTL.setPlaying(true);
 }
 function pause() { state.playing = false; playTL.setPlaying(false); }
@@ -239,12 +244,32 @@ document.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click',
   document.querySelectorAll('[data-cam]').forEach(x => x.classList.toggle('is-on', x === b));
   try { view3d?.setCamera(b.dataset.cam); } catch (e) { console.warn(e); }
 }));
-$('#ghostBtn').addEventListener('click', e => {
-  const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
-  e.currentTarget.setAttribute('aria-pressed', String(on));
-  e.currentTarget.classList.toggle('is-on', on);
-  try { view3d?.setGhost(on); } catch (err) { console.warn(err); }
+$('#voiceBtn').addEventListener('click', e => {
+  state.voice = !state.voice;
+  e.currentTarget.setAttribute('aria-pressed', String(state.voice));
+  e.currentTarget.classList.toggle('is-on', state.voice);
+  e.currentTarget.textContent = state.voice ? '🔊 Annonce' : '🔇 Annonce';
+  if (!state.voice) tts.stop();
 });
+
+// ---------- Tracés : carte + annonce vocale ----------
+function renderRouteCard() {
+  const el = $('#routeCard'), a = state.ana;
+  if (!a || (!a.routes.length && !a.misplaced.length)) { el.hidden = true; return; }
+  const off = state.rep.side !== 'defense';
+  const li = (n, r, small, i) => `<li style="animation-delay:${(i * 0.06).toFixed(2)}s"><span class="n">${n}</span><span class="r">${r}</span>${small ? `<small>${esc(small)}</small>` : ''}</li>`;
+  el.innerHTML = `
+    <h4>${off ? 'Tracés de l’attaque' : `Tracés ${esc(state.session.opponent || 'adverses')}`}</h4>
+    <ul>${a.routes.map((t, i) => li(t.jersey != null ? '#' + t.jersey : '', esc(t.route), `${t.name} · ${t.hint}`, i)).join('')}</ul>
+    ${a.misplaced.length ? `<div class="rc-sec rc-bad"><h4 style="color:#f87171">Mal placés</h4><ul>${a.misplaced.map((b, i) => li('#' + (b.jersey ?? ''), esc(b.issue), b.name, i + a.routes.length)).join('')}</ul></div>` : ''}
+    <div class="rc-legend"><span><i style="border-color:#22c55e"></i>Bien placé</span><span><i style="border-color:#ef4444"></i>Mal placé</span></div>`;
+  el.hidden = false;
+  el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+}
+function announceRoutes() {
+  if (!state.ana?.speech) return;
+  tts.speak(state.ana.speech, { id: 'routes', rate: 1.05 });
+}
 
 // ---------- Réglages ----------
 function openSettings(refresh = false) {

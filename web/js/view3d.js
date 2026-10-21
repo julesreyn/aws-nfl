@@ -2,6 +2,53 @@
 // Repère: terrain (x, y) en yards -> three (X = x, Y = haut, Z = -y). 1 unité = 1 yard.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+import { analyzeRep } from "./analysis.js";
+
+// ---------------------------------------------------------------- modèles 3D (joueur FBX + drone OBJ), chargés une fois
+const MODEL_DIR = "models/american-football-player/";
+let assets = null;
+function loadAssets() {
+  if (assets) return assets;
+  const mgr = new THREE.LoadingManager();
+  // le FBX référence des chemins Windows absolus : on ne garde que le nom du fichier
+  mgr.setURLModifier((url) => {
+    const m = /([^\\/]+\.(png|jpe?g))$/i.exec(decodeURIComponent(url));
+    if (!m || url.startsWith("data:") || url.startsWith("blob:")) return url;
+    const alias = { "base4.jpg": "b.jpg", "normal.jpg": "n.jpg", "bump.jpg": "n.jpg", "bumpy.jpg": "n.jpg" };
+    return MODEL_DIR + "textures/" + (alias[m[1].toLowerCase()] || m[1]);
+  });
+  const player = new FBXLoader(mgr).loadAsync(MODEL_DIR + "source/3x.fbx").then((fbx) => {
+    const box = new THREE.Box3().setFromObject(fbx);
+    const h = box.max.y - box.min.y || 1;
+    const k = 2.15 / h; // ~1,95 m ≈ 2,15 yd avec casque
+    fbx.scale.setScalar(k);
+    fbx.position.y = -box.min.y * k;
+    fbx.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    const holder = new THREE.Group();
+    holder.add(fbx);
+    return { obj: holder, clips: fbx.animations || [] };
+  });
+  const drone = new MTLLoader().setPath("models/Drone/").loadAsync("Drone.mtl").then((mtl) => {
+    mtl.preload();
+    return new OBJLoader().setMaterials(mtl).setPath("models/Drone/").loadAsync("Drone.obj");
+  }).then((obj) => {
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    const k = 2.4 / Math.max(size.x, size.z, 0.001);
+    obj.scale.setScalar(k);
+    const c = box.getCenter(new THREE.Vector3());
+    obj.position.set(-c.x * k, -c.y * k, -c.z * k);
+    const g = new THREE.Group(); g.add(obj);
+    return g;
+  });
+  assets = { player: player.catch((e) => { console.warn("modèle joueur", e); return null; }),
+    drone: drone.catch((e) => { console.warn("modèle drone", e); return null; }) };
+  return assets;
+}
 
 const FIELD_L = 120;
 const FIELD_W = 53.3;
@@ -9,7 +56,7 @@ const OURS = "#d50a0a";
 const THEM = "#64748b";
 const GHOST = 0x22d3ee;
 const HASH_Y = 23.58;
-const SPR = 0.034; // taille écran des pastilles de numéro // distance des hash marks au bord (NFL)
+const SPR = 0.016; // taille écran des pastilles de numéro // distance des hash marks au bord (NFL)
 
 const W = (x, y, h = 0) => new THREE.Vector3(x, h, -y);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -200,6 +247,16 @@ export function createView3D(container, { onSelectPlayer } = {}) {
   const camTarget = new THREE.Vector3(60, 0, -FIELD_W / 2);
   camera.lookAt(camTarget);
 
+  const drone = new THREE.PerspectiveCamera(50, 1.6, 0.1, 400);
+  let droneOn = true;
+  const bubbles = document.createElement("div");
+  bubbles.className = "v3d-bubbles";
+  root.appendChild(bubbles);
+  const droneBox = document.createElement("div");
+  droneBox.className = "v3d-drone";
+  droneBox.innerHTML = '<span class="v3d-drone-tag"><i></i>Vue du drone</span>';
+  root.appendChild(droneBox);
+
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
@@ -308,6 +365,12 @@ export function createView3D(container, { onSelectPlayer } = {}) {
     ring: new THREE.RingGeometry(0.78, 1.0, 56),
     disc: new THREE.CircleGeometry(0.78, 40),
     ball: new THREE.SphereGeometry(1, 20, 14),
+    square: (() => {
+      const sh = new THREE.Shape([[-0.9, -0.9], [0.9, -0.9], [0.9, 0.9], [-0.9, 0.9]].map(([x, y]) => new THREE.Vector2(x, y)));
+      sh.holes.push(new THREE.Path([[-0.7, -0.7], [-0.7, 0.7], [0.7, 0.7], [0.7, -0.7]].map(([x, y]) => new THREE.Vector2(x, y))));
+      return new THREE.ShapeGeometry(sh);
+    })(),
+    squareFill: new THREE.PlaneGeometry(1.4, 1.4),
   };
   const mkMats = (jersey, pants, helmet) => ({
     jersey: new THREE.MeshStandardMaterial({ color: jersey, roughness: 0.65 }),
@@ -327,6 +390,12 @@ export function createView3D(container, { onSelectPlayer } = {}) {
     trail: new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.75, depthWrite: false }),
     trailPast: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false }),
     ball: new THREE.MeshStandardMaterial({ color: 0x7a3b12, roughness: 0.55 }),
+    sqOk: new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }),
+    sqBad: new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }),
+    sqOkFill: new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.18, depthWrite: false }),
+    sqBadFill: new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.25, depthWrite: false }),
+    route: new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.55, depthWrite: false }),
+    routeThem: new THREE.MeshBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.45, depthWrite: false }),
     dash: new THREE.LineDashedMaterial({ color: GHOST, dashSize: 0.45, gapSize: 0.3, transparent: true, opacity: 0.9 }),
   };
 
@@ -378,7 +447,9 @@ export function createView3D(container, { onSelectPlayer } = {}) {
   let passF = -1, passA = -1;
   let losX = 60, ballSnapY = FIELD_W / 2;
   let selected = null;
-  let preset = "top";
+  let preset = "madden";
+  let ana = { players: {}, routes: [], misplaced: [] };
+  let routeMeshes = [];
   let ghostOn = false;
   let snapCam = true;
 
@@ -422,6 +493,9 @@ export function createView3D(container, { onSelectPlayer } = {}) {
     ghosts = new Map();
     ball = null;
     clearTrail();
+    for (const m of routeMeshes) { m.geometry.dispose(); scene.remove(m); }
+    routeMeshes = [];
+    bubbles.innerHTML = "";
   }
   function clearTrail() {
     for (const t of [trail, trailPast]) {
@@ -439,6 +513,7 @@ export function createView3D(container, { onSelectPlayer } = {}) {
   function setRep(r, t, s) {
     clearDynamic();
     rep = r || null; track = t || null; session = s || null;
+    ana = analyzeRep(rep, track, session);
     const pl = (track && track.players) || {};
     ballData = track && Array.isArray(track.ball) ? track.ball : null;
     ballXY = null;
@@ -476,8 +551,35 @@ export function createView3D(container, { onSelectPlayer } = {}) {
       sprite.renderOrder = 5;
       av.yaw.add(sprite);
       dyn.add(av.yaw);
-      players.set(String(id), { id: String(id), ours, data, av, hit, sprite, tex, phase: Math.random() * 6 });
+      const a = ana.players[id] || {};
+      const off = a.offset || null;
+      let sq = null;
+      if (typeof a.ok === "boolean") {
+        sq = new THREE.Group();
+        const edge = new THREE.Mesh(G.square, a.ok ? M.sqOk : M.sqBad);
+        const fillM = new THREE.Mesh(G.squareFill, a.ok ? M.sqOkFill : M.sqBadFill);
+        for (const m of [edge, fillM]) { m.rotation.x = -Math.PI / 2; m.renderOrder = 3; sq.add(m); }
+        edge.position.y = 0.05; fillM.position.y = 0.04;
+        dyn.add(sq);
+      }
+      let bub = null;
+      const info2 = playerInfo(id);
+      const jn = info2 && info2.jersey != null ? "#" + info2.jersey : "";
+      if (a.route || a.ok === false) {
+        bub = document.createElement("div");
+        bub.className = "v3d-bub " + (a.ok === false ? "bad" : ours ? "ours" : "them");
+        const ln = info2 && info2.name ? info2.name.split(" ").slice(-1)[0] : "";
+        bub.innerHTML = a.ok === false
+          ? `<b>${jn} ${ln}</b><span>Mal placé · ${a.issue}</span>`
+          : `<b>${jn} ${ln}</b><span>${a.route}</span>`;
+        bub.style.animationDelay = `${(bubbles.children.length * 0.08).toFixed(2)}s`;
+        bubbles.appendChild(bub);
+      }
+      if (bub || sq) sprite.visible = false;
+      players.set(String(id), { id: String(id), ours, data, av, hit, sprite, tex, phase: Math.random() * 6, off, sq, bub, hideSprite: !!(bub || sq) });
     }
+    buildRoutes();
+    applyModels();
     // fantômes (TB seulement)
     for (const p of players.values()) {
       if (!p.ours) continue;
@@ -527,6 +629,56 @@ export function createView3D(container, { onSelectPlayer } = {}) {
     scene.add(trail);
   }
 
+  let playerAsset = null;
+  const mixers = [];
+  function applyModels() {
+    if (!playerAsset) return;
+    mixers.length = 0;
+    for (const p of players.values()) {
+      if (p.model) continue;
+      const m = SkeletonUtils.clone(playerAsset.obj);
+      const tint = new THREE.Color(p.ours ? 0xff6b6b : 0x9fb3d1);
+      m.traverse((o) => {
+        if (o.isMesh) o.material = (Array.isArray(o.material) ? o.material : [o.material]).map((mt) => {
+          const c = mt.clone(); c.color = tint; return c;
+        });
+      });
+      p.av.yaw.add(m);
+      p.av.body.visible = false;
+      p.model = m;
+      if (playerAsset.clips.length) {
+        const mx = new THREE.AnimationMixer(m);
+        const act = mx.clipAction(playerAsset.clips[0]); act.time = Math.random() * 2; act.play();
+        mixers.push(mx);
+      }
+    }
+  }
+  let droneMesh = null;
+  const A = loadAssets();
+  A.player.then((a) => { if (disposed || !a) return; playerAsset = a; applyModels(); });
+  A.drone.then((d) => { if (disposed || !d) return; droneMesh = d.clone(); scene.add(droneMesh); });
+
+  function buildRoutes() {
+    const snap = snapIdx;
+    for (const t of ana.routes) {
+      const p = players.get(String(t.id));
+      if (!p) continue;
+      const pts = [];
+      for (let i = snap; i < p.data.length; i++) {
+        const r = p.data[i];
+        if (!validRow(r)) continue;
+        const v = W(r[0] + (p.off ? p.off.dx : 0), r[1] + (p.off ? p.off.dy : 0), 0.07);
+        if (!pts.length || pts[pts.length - 1].distanceToSquared(v) > 0.04) pts.push(v);
+      }
+      if (pts.length < 2) continue;
+      const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), Math.min(300, pts.length * 3), 0.11, 5, false),
+        t.ours ? M.route : M.routeThem);
+      m.renderOrder = 2;
+      scene.add(m);
+      routeMeshes.push(m);
+    }
+  }
+
   // ------------------------------------------------------------ mise à jour par frame
   function ballHeight(f) {
     if (passF >= 0 && passA > passF) {
@@ -553,9 +705,11 @@ export function createView3D(container, { onSelectPlayer } = {}) {
   const tmpV = new THREE.Vector3();
   function placePlayer(p, f, df) {
     const st = sample(p.data, f);
-    if (!st) { p.av.yaw.visible = false; p.cur = null; return; }
+    if (!st) { p.av.yaw.visible = false; p.cur = null; if (p.sq) p.sq.visible = false; return; }
     p.av.yaw.visible = true;
+    if (p.off) { st.x += p.off.dx; st.y += p.off.dy; }
     p.cur = st;
+    if (p.sq) { p.sq.visible = true; p.sq.position.set(st.x, 0, -st.y); }
     p.av.yaw.position.copy(W(st.x, st.y));
     const o = st.o == null ? 90 : st.o;
     p.av.yaw.rotation.y = Math.PI - THREE.MathUtils.degToRad(o);
@@ -648,11 +802,11 @@ export function createView3D(container, { onSelectPlayer } = {}) {
       p.sprite.getWorldPosition(sprW);
       const d = sprW.distanceTo(camera.position);
       p.sprite.material.opacity = clamp((d - 3) / 4, 0, 1);
-      p.sprite.visible = p.sprite.material.opacity > 0.02;
+      p.sprite.visible = !p.hideSprite && p.sprite.material.opacity > 0.02;
       // avatar collé à la caméra: on le masque pour ne pas boucher la vue
       if (p.cur) {
         const near = Math.hypot(camera.position.x - p.cur.x, camera.position.z + p.cur.y) < 2.2 && camera.position.y < 4;
-        p.av.body.visible = !near;
+        if (p.model) p.model.visible = !near; else p.av.body.visible = !near;
       }
     }
     for (const gh of ghosts.values()) {
@@ -726,6 +880,14 @@ export function createView3D(container, { onSelectPlayer } = {}) {
         }
         break;
       }
+      case "madden": {
+        // caméra « broadcast jeu vidéo » : derrière l'attaque, en hauteur, suit le ballon
+        const bx = ball && ball.visible ? ball.position.x : losX;
+        const fx = Math.max(losX, Math.min(bx, losX + 25));
+        desiredPos.copy(W(fx - 13, ballSnapY * 0.6 + cy * 0.4, 9));
+        desiredTgt.copy(W(fx + 10, ballSnapY * 0.6 + cy * 0.4, 0));
+        break;
+      }
       case "free":
         return false;
       case "top":
@@ -769,8 +931,53 @@ export function createView3D(container, { onSelectPlayer } = {}) {
     // ombres centrées sur l'action
     sun.target.position.set(losX + 5, 0, -FIELD_W / 2);
     sun.position.set(losX - 25, 70, 25);
+    for (const mx of mixers) mx.update(dt);
+    if (droneMesh) {
+      // le drone survole l'action : visible depuis la caméra Madden
+      droneMesh.position.set(losX + 8 + Math.sin(t * 0.25) * 2, 14 + Math.sin(t * 0.9) * 0.6, -FIELD_W / 2 + 6);
+      droneMesh.rotation.y = Math.sin(t * 0.3) * 0.3;
+    }
     fadeSprites();
+    const w = root.clientWidth, h = root.clientHeight;
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, w, h);
     renderer.render(scene, camera);
+    placeBubbles(w, h);
+    // vue du drone (encart en haut à droite)
+    if (droneOn && w > 360) {
+      const dw = Math.round(Math.min(300, w * 0.3)), dh = Math.round(dw * 0.62);
+      const m = 12, x = w - dw - m, y = h - dh - 56;
+      drone.aspect = dw / dh; drone.updateProjectionMatrix();
+      const hover = Math.sin(t * 0.9) * 0.6;
+      drone.position.set(losX + 8 + Math.sin(t * 0.25) * 2, 42 + hover, -FIELD_W / 2 + 14);
+      drone.lookAt(losX + 8, 0, -FIELD_W / 2);
+      renderer.setScissorTest(true);
+      renderer.setScissor(x, y, dw, dh);
+      renderer.setViewport(x, y, dw, dh);
+      const fog = scene.fog; scene.fog = null;
+      for (const p of players.values()) p.sprite.visible = false;
+      renderer.render(scene, drone);
+      scene.fog = fog;
+      renderer.setScissorTest(false);
+      droneBox.style.width = dw + "px"; droneBox.style.height = dh + "px";
+      droneBox.hidden = false;
+    } else droneBox.hidden = true;
+  }
+
+  const projV = new THREE.Vector3();
+  function placeBubbles(w, h) {
+    const dr = droneBox.hidden ? null : { x0: w - droneBox.offsetWidth - 20, y1: droneBox.offsetHeight + 64 };
+    for (const p of players.values()) {
+      if (!p.bub) continue;
+      if (!p.cur || !p.av.yaw.visible) { p.bub.style.display = "none"; continue; }
+      projV.set(p.cur.x, 3.1, -p.cur.y).project(camera);
+      const sx = (projV.x * 0.5 + 0.5) * w, sy = (-projV.y * 0.5 + 0.5) * h;
+      const inDrone = dr && sx > dr.x0 && sy < dr.y1;
+      if (projV.z > 1 || sx < -50 || sx > w + 50 || sy < -20 || sy > h + 20 || inDrone) { p.bub.style.display = "none"; continue; }
+      p.bub.style.display = "";
+      p.bub.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -100%)`;
+      p.bub.style.zIndex = String(1000 - Math.round(projV.z * 900));
+    }
   }
 
   // ------------------------------------------------------------ interactions
@@ -851,8 +1058,8 @@ export function createView3D(container, { onSelectPlayer } = {}) {
     update(0);
   }
   function setCamera(p) {
-    const valid = ["top", "qb", "line", "receiver", "free"];
-    const next = valid.includes(p) ? p : "top";
+    const valid = ["madden", "top", "qb", "line", "receiver", "free"];
+    const next = valid.includes(p) ? p : "madden";
     if (next === "free") controls.target.copy(camTarget);
     preset = next;
   }
@@ -890,5 +1097,7 @@ export function createView3D(container, { onSelectPlayer } = {}) {
     root.remove();
   }
 
-  return { setRep, setFrame, setSelected, setCamera, setGhost, resize, dispose };
+  function setDrone(b) { droneOn = !!b; }
+  function getAnalysis() { return ana; }
+  return { setRep, setFrame, setSelected, setCamera, setGhost, setDrone, getAnalysis, resize, dispose };
 }

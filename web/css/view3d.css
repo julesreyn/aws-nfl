@@ -4,3 +4,29 @@
   background: rgba(10, 15, 28, 0.88); color: #f1f5f9; font: 600 12px/1.3 system-ui, -apple-system, sans-serif;
   border: 1px solid rgba(255, 255, 255, 0.12); white-space: nowrap; opacity: 0; transition: opacity 120ms ease; }
 .v3d-tip.on { opacity: 1; }
+
+/* bulles au-dessus des joueurs */
+.v3d-bubbles { position: absolute; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+.v3d-bub { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 4px 9px 5px; border-radius: 9px; background: rgba(10, 15, 28, 0.9); color: #f8fafc; white-space: nowrap;
+  font: 600 11px/1.15 "Barlow", system-ui, sans-serif; border: 1.5px solid #facc15; box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  animation: bubIn .45s cubic-bezier(.2,1.4,.4,1) both; will-change: transform; }
+.v3d-bub::after { content: ""; position: absolute; bottom: -6px; left: 50%; margin-left: -5px; border: 5px solid transparent;
+  border-bottom: 0; border-top-color: inherit; }
+.v3d-bub b { font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .02em; opacity: .85; }
+.v3d-bub span { font: 800 14px/1.05 "Barlow Condensed", sans-serif; text-transform: uppercase; color: #facc15; }
+.v3d-bub.them { border-color: #93c5fd; } .v3d-bub.them span { color: #bfdbfe; }
+.v3d-bub.bad { border-color: #ef4444; background: rgba(60, 8, 8, 0.92); animation: bubIn .45s cubic-bezier(.2,1.4,.4,1) both, bubPulse 1.4s ease-in-out .5s infinite; }
+.v3d-bub.bad span { color: #fecaca; font-size: 12px; text-transform: none; }
+@keyframes bubIn { from { opacity: 0; margin-top: 14px; scale: .6; } to { opacity: 1; margin-top: 0; scale: 1; } }
+@keyframes bubPulse { 50% { box-shadow: 0 0 0 6px rgba(239,68,68,.25), 0 6px 18px rgba(0,0,0,.35); } }
+
+/* encart vue du drone */
+.v3d-drone { position: absolute; top: 56px; right: 12px; z-index: 3; pointer-events: none; border-radius: 10px;
+  border: 2px solid rgba(250, 204, 21, .9); box-shadow: 0 10px 30px rgba(0,0,0,.45); animation: droneIn .6s ease both; }
+.v3d-drone-tag { position: absolute; left: 8px; top: 8px; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px;
+  border-radius: 999px; background: rgba(10,15,28,.85); color: #fff; font: 700 13px/1.2 "Barlow Condensed", sans-serif;
+  letter-spacing: .06em; text-transform: uppercase; }
+.v3d-drone-tag i { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: rec 1.2s infinite; }
+@keyframes rec { 50% { opacity: .2; } }
+@keyframes droneIn { from { opacity: 0; transform: translateY(-10px) scale(.95); } }
