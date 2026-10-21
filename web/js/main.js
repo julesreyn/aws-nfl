@@ -211,7 +211,7 @@ async function setDim(d) {
       view3dLoading = view3dLoading || import('./view3d.js');
       const mod = await view3dLoading;
       $('#field3d').hidden = false;
-      view3d = mod.createView3D($('#field3d'), { onSelectPlayer: id => select(id) });
+      view3d = mod.createView3D($('#field3d'), { onSelectPlayer: id => select(id), onRoutes: renderRoutesList });
       if (state.rep) {
         const track = state.tracking?.[String(state.rep.playId)] || state.tracking?.[String(state.rep.id)];
         view3d.setRep(state.rep, track, state.session);
@@ -230,6 +230,9 @@ async function setDim(d) {
   $('#field2d').hidden = d !== '2d';
   $('#field3d').hidden = d !== '3d';
   $('#camTools').hidden = d !== '3d';
+  if (d !== '3d') { $('#routesPanel').hidden = true; $('#placeLegend').hidden = true; }
+  const activeCam = document.querySelector('[data-cam].is-on')?.dataset.cam || 'top';
+  updateDroneBadge(d === '3d' ? activeCam : null);
   requestAnimationFrame(() => {
     if (d === '3d') { try { view3d.resize(); } catch (_) { /* */ } } else field2d.resize();
     setFrame(state.frame);
@@ -238,13 +241,60 @@ async function setDim(d) {
 document.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('[data-cam]').forEach(x => x.classList.toggle('is-on', x === b));
   try { view3d?.setCamera(b.dataset.cam); } catch (e) { console.warn(e); }
+  updateDroneBadge(b.dataset.cam);
 }));
+
+// Badge "Vue du drone" visible uniquement en vue du dessus (caméra drone) et en 3D.
+function updateDroneBadge(cam) {
+  const active = state.dim === '3d' && (cam === 'top');
+  const el = $('#droneBadge');
+  if (el) el.hidden = !active;
+}
 $('#ghostBtn').addEventListener('click', e => {
   const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
   e.currentTarget.setAttribute('aria-pressed', String(on));
   e.currentTarget.classList.toggle('is-on', on);
   try { view3d?.setGhost(on); } catch (err) { console.warn(err); }
 });
+
+// Toggle générique (aria-pressed + is-on) appliquant une méthode de la vue 3D.
+function wireToggle(sel, fn) {
+  const btn = $(sel);
+  if (!btn) return;
+  btn.addEventListener('click', e => {
+    const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+    e.currentTarget.classList.toggle('is-on', on);
+    try { fn(on); } catch (err) { console.warn(err); }
+  });
+}
+wireToggle('#bubbleBtn', on => view3d?.setBubbles(on));
+wireToggle('#misalignBtn', on => {
+  view3d?.setMisalign(on);
+  $('#placeLegend').hidden = !on;
+});
+wireToggle('#routesBtn', on => {
+  view3d?.setRoutes(on);
+  $('#routesPanel').hidden = !on;
+  if (on && view3d) renderRoutesList(view3d.getRoutes());
+});
+
+// Liste des tracés d'attaque (nom + joueur), alimentée par la vue 3D.
+function renderRoutesList(routes) {
+  const ul = $('#routesList');
+  if (!ul) return;
+  if (!routes || !routes.length) {
+    ul.innerHTML = '<li class="rt-empty">Aucun tracé sur cet essai (jeu au sol ou données manquantes).</li>';
+    return;
+  }
+  ul.innerHTML = routes.map(r => `
+    <li>
+      <span class="rt-dot" style="background:${esc(r.color)}"></span>
+      <span class="rt-name">${esc(r.name)}</span>
+      <span class="rt-who">${r.jersey != null ? '#' + esc(r.jersey) : ''} ${esc(r.pos || '')}</span>
+      <span class="rt-depth">${esc(r.depth)} yd</span>
+    </li>`).join('');
+}
 
 // ---------- Réglages ----------
 function openSettings(refresh = false) {

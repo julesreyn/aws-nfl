@@ -170,7 +170,7 @@ code { font-family: ui-monospace, Menlo, monospace; background: var(--panel-2); 
 .field-host canvas { display: block; }
 .field-host.is-loading::after { content: "Chargement du tracking…"; position: absolute; inset: 0; display: grid; place-items: center; background: rgba(12, 20, 17, .7); color: var(--muted); font-weight: 600; }
 
-.field-tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 8px; align-items: center; z-index: 3; flex-wrap: wrap; justify-content: flex-end; }
+.field-tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 8px; align-items: center; z-index: 5; flex-wrap: wrap; justify-content: flex-end; }
 .field-tools .seg { background: rgba(10, 17, 14, .82); backdrop-filter: blur(6px); }
 .cam-tools { display: flex; gap: 8px; align-items: center; }
 .chip-btn { border: 1px solid var(--line-2); background: rgba(10, 17, 14, .82); padding: 5px 12px; border-radius: 8px; font-weight: 600; font-size: 13px; color: var(--muted); }
@@ -183,7 +183,7 @@ code { font-family: ui-monospace, Menlo, monospace; background: var(--panel-2); 
   background: rgba(10, 17, 14, .82); backdrop-filter: blur(6px);
   border: 1px solid var(--line);
   font-size: 12.5px; color: var(--muted);
-  max-width: calc(100% - 200px);
+  max-width: calc(100% - 420px);
 }
 .rb-drill { font: 700 15px/1 var(--f-display); color: var(--text); }
 .rb-rep { font-variant-numeric: tabular-nums; }
