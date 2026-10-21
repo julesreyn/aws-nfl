@@ -171,7 +171,7 @@ function SelectedCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 420, damping: 32 }}
       className={cn(
-        "glass rounded-2xl border p-3.5 shadow-lg",
+        "glass rounded-2xl border p-3.5",
         GRADE_BORDER[sel.grade]
       )}
     >

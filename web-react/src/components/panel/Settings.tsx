@@ -81,7 +81,7 @@ export function SettingsMenu() {
             initial={{ opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
-            className="glass flex flex-col gap-4 rounded-2xl border border-border/70 p-4 shadow-2xl shadow-black/40"
+            className="glass flex flex-col gap-4 rounded-2xl border border-border/70 p-4 elev-pop"
           >
             <div>
               <h3 className="mb-2 font-display text-base font-bold tracking-wide text-foreground">

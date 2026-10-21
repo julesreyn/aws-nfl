@@ -173,7 +173,7 @@ export default function App() {
 
                 {rep && (
                   <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-10 flex items-center gap-2">
-                    <span className="glass flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground shadow-lg">
+                    <span className="glass flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground">
                       <i className="inline-block h-[3px] w-3.5 rounded-sm align-middle bg-los" />
                       Scrimmage
                       <i className="ml-2 inline-block h-[3px] w-3.5 rounded-sm align-middle bg-brand-accent" />
@@ -206,7 +206,7 @@ export default function App() {
               initial={{ opacity: 0, x: 40, scale: 0.95 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 40, scale: 0.95 }}
-              className="glass pointer-events-auto max-w-sm rounded-xl border border-border/70 px-4 py-3 text-sm shadow-2xl shadow-black/40"
+              className="glass pointer-events-auto max-w-sm rounded-xl border border-border/70 px-4 py-3 text-sm elev-pop"
               dangerouslySetInnerHTML={{ __html: t.html }}
             />
           ))}

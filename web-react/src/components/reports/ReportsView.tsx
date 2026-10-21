@@ -811,7 +811,7 @@ function PlayerDetail({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 16, scale: 0.98 }}
         transition={{ type: "spring", stiffness: 360, damping: 32 }}
-        className="glass w-full max-w-[1040px] rounded-2xl border border-border/70 shadow-2xl shadow-black/50"
+        className="glass w-full max-w-[1040px] rounded-2xl border border-border/70 elev-pop"
       >
         <header className="flex flex-wrap items-center gap-5 border-b border-border/70 p-4">
           <div className="flex items-center gap-3">

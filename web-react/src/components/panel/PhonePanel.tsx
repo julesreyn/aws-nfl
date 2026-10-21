@@ -69,7 +69,7 @@ export function PhonePanel() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ type: "spring", stiffness: 420, damping: 32 }}
                         className={cn(
-                          "rounded-2xl border p-3 shadow-sm",
+                          "rounded-2xl border p-3",
                           m.kind === "brief"
                             ? "border-primary/30 bg-primary/5"
                             : "border-border/60 bg-card/60",

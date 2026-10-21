@@ -56,7 +56,7 @@ function RepChip({ rep, drillName, active, onOpen }: RepChipProps) {
         <Tooltip.Content
           side="bottom"
           sideOffset={8}
-          className="z-[60] max-w-[320px] rounded-lg border border-border/70 bg-popover/95 p-3 shadow-2xl backdrop-blur-md"
+          className="z-[60] max-w-[320px] rounded-lg border border-border/70 bg-popover/95 p-3 backdrop-blur-md elev-pop"
         >
           <motion.div
             initial={{ opacity: 0, y: -4 }}

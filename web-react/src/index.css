@@ -5,39 +5,39 @@
 
 /* ------------------------------------------------------------------ design tokens */
 :root {
-  --radius: 0.75rem;
+  --radius: 0.7rem;
 
-  /* Brand — Tampa Bay night-stadium premium */
-  --ours: #d50a0a;
-  --ours-soft: #ff5b52;
-  --them: #64748b;
-  --accent: #f2d14b;
-  --accent-ink: #1a1403;
-  --los: #4aa3ff;
-  --first-down: #f2d14b;
-  --grade-green: #22c55e;
-  --grade-orange: #f59e0b;
-  --grade-red: #ef4444;
+  /* Accents — sobres, désaturés, utilisés avec parcimonie */
+  --ours: #e5484d;
+  --ours-soft: #ff7b7e;
+  --them: #6b7280;
+  --accent: #e8c56a;        /* ambre feutré (ex-jaune vif) */
+  --accent-ink: #171310;
+  --los: #7aa2c4;           /* bleu-gris discret */
+  --first-down: #e8c56a;
+  --grade-green: #4ec08a;
+  --grade-orange: #d9a441;
+  --grade-red: #e5695f;
 
-  /* shadcn surface tokens (dark premium) */
-  --background: #070b14;
-  --foreground: #e8edf5;
-  --card: #0c1322;
-  --card-foreground: #e8edf5;
-  --popover: #0d1526;
-  --popover-foreground: #e8edf5;
-  --primary: #f2d14b;
-  --primary-foreground: #1a1403;
-  --secondary: #16203a;
-  --secondary-foreground: #cbd5e1;
-  --muted: #141d33;
-  --muted-foreground: #8b98ac;
-  --accent-bg: #1b2745;
-  --accent-foreground: #e8edf5;
-  --destructive: #ef4444;
-  --border: #1e2a45;
-  --input: #1e2a45;
-  --ring: #f2d14b;
+  /* Surfaces — noir / gris neutre (zinc), zéro teinte bleue */
+  --background: #0a0a0b;
+  --foreground: #ededef;
+  --card: #141416;
+  --card-foreground: #ededef;
+  --popover: #18181b;
+  --popover-foreground: #ededef;
+  --primary: #e8c56a;
+  --primary-foreground: #171310;
+  --secondary: #1c1c1f;
+  --secondary-foreground: #d4d4d8;
+  --muted: #19191c;
+  --muted-foreground: #8a8a92;
+  --accent-bg: #242428;
+  --accent-foreground: #ededef;
+  --destructive: #e5695f;
+  --border: #262629;
+  --input: #262629;
+  --ring: #3f3f46;
 
   --font-display: "Barlow Condensed", system-ui, sans-serif;
   --font-body: "Barlow", system-ui, -apple-system, sans-serif;
@@ -92,10 +92,7 @@ body,
 
 body {
   margin: 0;
-  background:
-    radial-gradient(1200px 600px at 70% -10%, rgba(74, 163, 255, 0.08), transparent 60%),
-    radial-gradient(900px 500px at 10% 110%, rgba(242, 209, 75, 0.06), transparent 55%),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -128,16 +125,17 @@ body {
     backdrop-filter: blur(12px) saturate(1.15);
     -webkit-backdrop-filter: blur(12px) saturate(1.15);
   }
-  /* Surface opaque élevée — hiérarchie par ombre plutôt que par blur. */
+  /* Surface opaque — hiérarchie par bordure/fond, sans ombre. */
   .card-elev {
     background: var(--card);
-    border: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
-    box-shadow:
-      0 1px 0 0 color-mix(in oklab, white 4%, transparent) inset,
-      0 10px 30px -12px rgba(0, 0, 0, 0.55);
+    border: 1px solid var(--border);
   }
   .text-balance {
     text-wrap: balance;
+  }
+  /* Ombre neutre discrète, réservée aux surfaces flottantes (popover, toast, modal). */
+  .elev-pop {
+    box-shadow: 0 8px 24px -14px rgba(0, 0, 0, 0.7);
   }
   .tnum {
     font-variant-numeric: tabular-nums;
@@ -166,7 +164,9 @@ body {
 /* Focus clavier cohérent sur tous les éléments interactifs. */
 :where(button, a, select, input, [role="tab"], [tabindex]):focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px color-mix(in oklab, var(--ring) 70%, transparent);
+  outline: 1.5px solid var(--muted-foreground);
+  outline-offset: 2px;
+  box-shadow: none;
   border-radius: var(--radius-md);
 }
 

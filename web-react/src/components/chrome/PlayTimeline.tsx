@@ -120,7 +120,7 @@ export function PlayTimeline() {
           aria-label={playing ? "Pause" : "Lecture"}
           title="Lecture / pause (Espace)"
           whileTap={{ scale: 0.94 }}
-          className="mx-1 grid size-11 cursor-pointer place-items-center rounded-full bg-foreground text-background shadow-lg transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="mx-1 grid size-11 cursor-pointer place-items-center rounded-full bg-foreground text-background transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
         >
           {playing ? <IconPause size={20} weight="fill" /> : <IconPlay size={20} weight="fill" />}
         </motion.button>
@@ -198,7 +198,7 @@ export function PlayTimeline() {
             style={{ width: `${pct(frame)}%` }}
           />
           <motion.div
-            className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0_4px_rgba(242,209,75,.3)]"
+            className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/40 bg-white"
             style={{ left: `${pct(frame)}%` }}
           />
         </div>

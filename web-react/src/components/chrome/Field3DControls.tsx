@@ -58,7 +58,7 @@ function ToggleChip({
         "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-[6px] text-[13px] font-semibold transition-colors duration-150",
         "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
         active
-          ? "border-transparent bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+          ? "border-transparent bg-primary text-primary-foreground"
           : "border-border/70 bg-card/80 text-muted-foreground hover:bg-accent hover:text-foreground"
       )}
     >
@@ -96,7 +96,7 @@ export function Field3DControls() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
         transition={{ type: "spring", stiffness: 380, damping: 32 }}
-        className="glass pointer-events-auto ml-auto flex w-fit flex-wrap items-center gap-2 rounded-2xl border border-border/70 p-1.5 shadow-xl shadow-black/40"
+        className="glass pointer-events-auto ml-auto flex w-fit flex-wrap items-center gap-2 rounded-2xl border border-border/70 p-1.5"
       >
         <Segmented<CameraPreset>
           options={cameraOptions}
@@ -130,7 +130,7 @@ export function Field3DControls() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: -6 }}
             transition={{ type: "spring", stiffness: 420, damping: 30 }}
-            className="glass pointer-events-none absolute left-2.5 top-[52px] flex items-center gap-2 rounded-xl border border-border/70 px-3 py-1.5 shadow-lg"
+            className="glass pointer-events-none absolute left-2.5 top-[52px] flex items-center gap-2 rounded-xl border border-border/70 px-3 py-1.5"
           >
             <motion.span
               aria-hidden="true"
@@ -164,7 +164,7 @@ export function Field3DControls() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ type: "spring", stiffness: 420, damping: 30 }}
-            className="glass pointer-events-none absolute bottom-2.5 left-2.5 grid gap-1.5 rounded-xl border border-border/70 px-3 py-2 text-[12.5px] shadow-lg"
+            className="glass pointer-events-none absolute bottom-2.5 left-2.5 grid gap-1.5 rounded-xl border border-border/70 px-3 py-2 text-[12.5px]"
           >
             <div className="flex items-center gap-2">
               <span className="size-3 rounded-sm bg-grade-green" />
