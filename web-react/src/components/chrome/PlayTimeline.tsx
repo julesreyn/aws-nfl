@@ -1,6 +1,12 @@
 import { useRef } from "react";
 import { motion } from "motion/react";
-import { Pause, Play, SkipBack, SkipForward, RotateCcw } from "lucide-react";
+import {
+  IconPause,
+  IconPlay,
+  IconStepBack,
+  IconStepForward,
+  IconRestart,
+} from "@/components/ui/icons";
 import { useStore } from "@/store";
 import { fmtSeconds } from "@/lib/tracking";
 import { Button } from "@/components/ui/button";
@@ -96,7 +102,7 @@ export function PlayTimeline() {
           title="Revenir au début (Début)"
           className="size-8 rounded-lg"
         >
-          <RotateCcw />
+          <IconRestart size={18} />
         </Button>
         <Button
           variant="ghost"
@@ -106,7 +112,7 @@ export function PlayTimeline() {
           title="Image précédente (←)"
           className="size-8 rounded-lg"
         >
-          <SkipBack />
+          <IconStepBack size={18} weight="fill" />
         </Button>
         <motion.button
           type="button"
@@ -116,7 +122,7 @@ export function PlayTimeline() {
           whileTap={{ scale: 0.94 }}
           className="mx-1 grid size-11 cursor-pointer place-items-center rounded-full bg-foreground text-background shadow-lg transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
         >
-          {playing ? <Pause className="size-5 fill-current" /> : <Play className="size-5 fill-current" />}
+          {playing ? <IconPause size={20} weight="fill" /> : <IconPlay size={20} weight="fill" />}
         </motion.button>
         <Button
           variant="ghost"
@@ -126,7 +132,7 @@ export function PlayTimeline() {
           title="Image suivante (→)"
           className="size-8 rounded-lg"
         >
-          <SkipForward />
+          <IconStepForward size={18} weight="fill" />
         </Button>
         <Segmented<SpeedKey>
           options={SPEED_OPTIONS}

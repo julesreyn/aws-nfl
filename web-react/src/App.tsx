@@ -138,17 +138,17 @@ export default function App() {
         ) : (
           <motion.section
             key="seance"
-            className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[1fr_380px]"
+            className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 p-2.5 lg:grid-cols-[1fr_360px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
             {/* Left column: timeline + stage */}
-            <div className="flex min-h-0 min-w-0 flex-col gap-3">
+            <div className="flex min-h-0 min-w-0 flex-col gap-2.5">
               <SessionTimeline />
 
-              <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-border/70 bg-[#0b1611] shadow-2xl shadow-black/40">
+              <div className="card-elev relative min-h-0 flex-1 overflow-hidden rounded-2xl !border-border/40 !bg-[#0a140f]">
                 {/* field */}
                 <div className="absolute inset-0" style={{ display: dim === "2d" ? "block" : "none" }}>
                   <Field2D />
@@ -158,7 +158,7 @@ export default function App() {
                 </div>
 
                 {/* top-left dim switch */}
-                <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
+                <div className="absolute left-2.5 top-2.5 z-10 flex items-center gap-2">
                   <Segmented<Dim>
                     options={DIM_OPTIONS}
                     value={dim}
@@ -172,11 +172,11 @@ export default function App() {
                 <Field3DControls />
 
                 {rep && (
-                  <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className="glass rounded-md px-2 py-1">
-                      <i className="mr-1 inline-block h-[3px] w-3.5 rounded-sm align-middle bg-los" />
+                  <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-10 flex items-center gap-2">
+                    <span className="glass flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground shadow-lg">
+                      <i className="inline-block h-[3px] w-3.5 rounded-sm align-middle bg-los" />
                       Scrimmage
-                      <i className="mx-1 ml-3 inline-block h-[3px] w-3.5 rounded-sm align-middle bg-brand-accent" />
+                      <i className="ml-2 inline-block h-[3px] w-3.5 rounded-sm align-middle bg-brand-accent" />
                       Ligne à gagner
                     </span>
                   </div>
@@ -187,8 +187,8 @@ export default function App() {
             </div>
 
             {/* Right column: panel */}
-            <aside className="flex min-h-0 flex-col gap-3 overflow-hidden">
-              <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border/70 bg-card/40">
+            <aside className="flex min-h-0 flex-col gap-2.5 overflow-hidden">
+              <div className="card-elev min-h-0 flex-1 overflow-y-auto rounded-2xl">
                 <RepPanel />
               </div>
               <PhonePanel />

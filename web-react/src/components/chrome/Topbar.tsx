@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import type * as React from "react";
-import { Settings2 } from "lucide-react";
+import { IconSettings } from "@/components/ui/icons";
 import { useStore } from "@/store";
 import type { ViewName } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -119,7 +119,7 @@ export function Topbar({ onToggleLive, onOpenSettings, settingsSlot }: TopbarPro
             title="Réglages des retours"
             className="rounded-xl"
           >
-            <Settings2 />
+            <IconSettings size={18} />
           </Button>
         )}
       </div>

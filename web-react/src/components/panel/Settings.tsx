@@ -2,7 +2,7 @@ import * as React from "react";
 import * as Popover from "@radix-ui/react-popover";
 import * as RadioGroup from "@radix-ui/react-radio-group";
 import { motion } from "motion/react";
-import { Settings as SettingsIcon } from "lucide-react";
+import { IconSettings as SettingsIcon } from "@/components/ui/icons";
 import * as settings from "@/lib/settings";
 import { useStore } from "@/store";
 import { cn } from "@/lib/utils";
@@ -67,7 +67,7 @@ export function SettingsMenu() {
     <Popover.Root>
       <Popover.Trigger asChild>
         <Button variant="outline" size="icon" aria-label="Réglages">
-          <SettingsIcon />
+          <SettingsIcon size={18} />
         </Button>
       </Popover.Trigger>
       <Popover.Portal>

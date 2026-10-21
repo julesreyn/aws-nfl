@@ -3,11 +3,12 @@
 import * as React from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { AnimatePresence, motion } from "motion/react";
-import { Volume2, X } from "lucide-react";
+import { IconSpeaker, IconClose, IconFootball, IconEye } from "@/components/ui/icons";
 import { useStore } from "@/store";
 import type { Drill, Grade, Metric, Rep, RepPlayer, Session } from "@/types";
 import { GRADE_LABEL } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 import * as tts from "@/lib/tts";
 
 // --------------------------------------------------------------------- consts
@@ -116,7 +117,7 @@ function SpeakButton({
         animate={speaking ? { scale: [1, 1.18, 1] } : { scale: 1 }}
         transition={speaking ? { duration: 1, repeat: Infinity } : { duration: 0.2 }}
       >
-        <Volume2 className="size-4" />
+        <IconSpeaker size={16} />
       </motion.span>
     </button>
   );
@@ -190,7 +191,7 @@ function SelectedCard({
           aria-label="Désélectionner"
           className="grid size-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
         >
-          <X className="size-4" />
+          <IconClose size={16} />
         </button>
       </div>
 
@@ -238,9 +239,11 @@ function RepTab({
 }) {
   if (!rep || !session) {
     return (
-      <p className="py-10 text-center text-sm italic text-muted-foreground">
-        Choisis un essai dans la timeline.
-      </p>
+      <EmptyState
+        icon={IconFootball}
+        title="Aucun essai sélectionné"
+        hint="Choisis un essai dans la frise du haut pour voir la note, le résumé coach et les retours joueurs."
+      />
     );
   }
 
@@ -297,7 +300,7 @@ function RepTab({
             </small>
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="label-xs">
               Essai {rep.index} · {rep.side === "offense" ? "Attaque" : "Défense"} · Q
               {rep.quarter} {rep.gameClock || ""}
             </p>
@@ -320,7 +323,7 @@ function RepTab({
                 key={f.label}
                 className="flex flex-col rounded-lg border border-border/60 bg-card/40 px-2.5 py-1.5"
               >
-                <small className="text-[10.5px] uppercase tracking-wide text-muted-foreground">
+                <small className="label-xs">
                   {f.label}
                 </small>
                 <b className="text-[13px] font-semibold capitalize text-foreground">{f.value}</b>
@@ -375,7 +378,7 @@ function RepTab({
                 aria-label="Désélectionner"
                 className="grid size-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
               >
-                <X className="size-4" />
+                <IconClose size={16} />
               </button>
             </div>
             <p className="text-[13px] text-muted-foreground">
@@ -385,15 +388,16 @@ function RepTab({
             </p>
           </motion.section>
         ) : (
-          <motion.p
+          <motion.div
             key="hint"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="rounded-xl border border-dashed border-border/60 px-3 py-4 text-center text-[13px] text-muted-foreground"
+            className="flex items-center gap-2.5 rounded-xl border border-dashed border-border/60 px-3.5 py-3 text-[13px] text-muted-foreground"
           >
-            Clique un joueur rouge sur le terrain ou dans la liste pour voir son retour.
-          </motion.p>
+            <IconEye size={17} className="shrink-0 text-muted-foreground" />
+            <span>Clique un joueur rouge sur le terrain ou dans la liste pour voir son retour.</span>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -408,7 +412,7 @@ function RepTab({
         <div className="flex flex-col gap-3">
           {groups.map((g) => (
             <div key={g}>
-              <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <h4 className="label-xs mb-1">
                 {GROUP_LABEL[g] || g}
               </h4>
               <ul className="flex flex-col gap-1">
@@ -589,7 +593,7 @@ function BriefTab({
                     {POINT_META[p.kind]?.icon || "•"}
                   </span>
                   <span className="min-w-0 leading-tight">
-                    <small className="block text-[10.5px] uppercase tracking-wide text-muted-foreground">
+                    <small className="label-xs block">
                       {POINT_META[p.kind]?.label || ""}
                     </small>
                     <span className="text-[13px] text-foreground/90">{p.text}</span>
@@ -630,7 +634,7 @@ function BriefTab({
           <dl className="flex flex-col gap-2.5">
             {groups.map(([g, t]) => (
               <div key={g}>
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <dt className="label-xs">
                   {GROUP_LABEL[g] || g}
                 </dt>
                 <dd className="mt-0.5 text-[13px] leading-snug text-foreground/85">{t}</dd>

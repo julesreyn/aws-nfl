@@ -122,20 +122,61 @@ body {
 }
 
 @layer utilities {
+  /* Glass réservé aux surfaces flottantes (topbar, overlays terrain). */
   .glass {
-    background: color-mix(in oklab, var(--card) 72%, transparent);
-    backdrop-filter: blur(14px) saturate(1.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    background: color-mix(in oklab, var(--card) 80%, transparent);
+    backdrop-filter: blur(12px) saturate(1.15);
+    -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  }
+  /* Surface opaque élevée — hiérarchie par ombre plutôt que par blur. */
+  .card-elev {
+    background: var(--card);
+    border: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, white 4%, transparent) inset,
+      0 10px 30px -12px rgba(0, 0, 0, 0.55);
   }
   .text-balance {
     text-wrap: balance;
   }
   .tnum {
     font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+  /* Micro-label uniforme (FORMATION, COUVERTURE, GROUPE…). */
+  .label-xs {
+    font-size: 10.5px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  /* Transition de survol unique partout. */
+  .hover-smooth {
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      box-shadow 140ms ease,
+      transform 140ms ease;
   }
 }
 
+/* Focus clavier cohérent sur tous les éléments interactifs. */
+:where(button, a, select, input, [role="tab"], [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px color-mix(in oklab, var(--ring) 70%, transparent);
+  border-radius: var(--radius-md);
+}
+
 /* grade helpers */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .g-green { color: var(--grade-green); }
 .g-orange { color: var(--grade-orange); }
 .g-red { color: var(--grade-red); }

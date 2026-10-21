@@ -3,7 +3,7 @@
 // Portage React de web/js/reports.js. Clic sur un essai -> onOpenRep(id).
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { X } from "lucide-react";
+import { IconClose } from "@/components/ui/icons";
 import { useStore } from "@/store";
 import type { Grade, Rep, Session } from "@/types";
 import { cn } from "@/lib/utils";
@@ -841,7 +841,7 @@ function PlayerDetail({
             aria-label="Fermer"
             className="grid size-9 place-items-center rounded-lg border border-border/70 bg-card/40 text-muted-foreground hover:text-foreground"
           >
-            <X className="size-4" />
+            <IconClose size={16} />
           </button>
         </header>
 

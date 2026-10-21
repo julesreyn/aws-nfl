@@ -1,6 +1,6 @@
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronDown, Smartphone } from "lucide-react";
+import { IconCaret, IconPhone } from "@/components/ui/icons";
 import { useStore } from "@/store";
 import { cn } from "@/lib/utils";
 
@@ -27,15 +27,16 @@ export function PhonePanel() {
         className="flex w-full items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-accent/30"
       >
         <span className="grid size-7 place-items-center rounded-lg bg-primary/15 text-primary">
-          <Smartphone className="size-4" />
+          <IconPhone size={16} />
         </span>
         <span className="flex-1 text-sm font-semibold text-foreground">Téléphone joueur</span>
         <span className="tnum rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
           {phone.length}
         </span>
-        <ChevronDown
+        <IconCaret
+          size={16}
           className={cn(
-            "size-4 text-muted-foreground transition-transform",
+            "text-muted-foreground transition-transform",
             open && "rotate-180"
           )}
         />
