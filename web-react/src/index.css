@@ -1,0 +1,144 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ------------------------------------------------------------------ design tokens */
+:root {
+  --radius: 0.75rem;
+
+  /* Brand — Tampa Bay night-stadium premium */
+  --ours: #d50a0a;
+  --ours-soft: #ff5b52;
+  --them: #64748b;
+  --accent: #f2d14b;
+  --accent-ink: #1a1403;
+  --los: #4aa3ff;
+  --first-down: #f2d14b;
+  --grade-green: #22c55e;
+  --grade-orange: #f59e0b;
+  --grade-red: #ef4444;
+
+  /* shadcn surface tokens (dark premium) */
+  --background: #070b14;
+  --foreground: #e8edf5;
+  --card: #0c1322;
+  --card-foreground: #e8edf5;
+  --popover: #0d1526;
+  --popover-foreground: #e8edf5;
+  --primary: #f2d14b;
+  --primary-foreground: #1a1403;
+  --secondary: #16203a;
+  --secondary-foreground: #cbd5e1;
+  --muted: #141d33;
+  --muted-foreground: #8b98ac;
+  --accent-bg: #1b2745;
+  --accent-foreground: #e8edf5;
+  --destructive: #ef4444;
+  --border: #1e2a45;
+  --input: #1e2a45;
+  --ring: #f2d14b;
+
+  --font-display: "Barlow Condensed", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-bg);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-ours: var(--ours);
+  --color-them: var(--them);
+  --color-brand-accent: var(--accent);
+  --color-los: var(--los);
+  --color-grade-green: var(--grade-green);
+  --color-grade-orange: var(--grade-orange);
+  --color-grade-red: var(--grade-red);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 70% -10%, rgba(74, 163, 255, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, rgba(242, 209, 75, 0.06), transparent 55%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* premium scrollbar */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--border) 85%, white 8%);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  background-clip: padding-box;
+}
+
+@layer utilities {
+  .glass {
+    background: color-mix(in oklab, var(--card) 72%, transparent);
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* grade helpers */
+.g-green { color: var(--grade-green); }
+.g-orange { color: var(--grade-orange); }
+.g-red { color: var(--grade-red); }
+.bg-g-green { background: var(--grade-green); }
+.bg-g-orange { background: var(--grade-orange); }
+.bg-g-red { background: var(--grade-red); }
