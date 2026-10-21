@@ -5,6 +5,7 @@ import { createPanel } from './panel.js';
 import { openBriefPreview } from './briefs.js';
 import * as tts from './tts.js';
 import * as settings from './settings.js';
+import { analyzeRep } from './analysis.js';
 
 const $ = s => document.querySelector(s);
 const FPS = 10;
@@ -12,7 +13,7 @@ const FPS = 10;
 const state = {
   sessions: [], session: null, tracking: null, repsById: {}, drillsById: {},
   rep: null, frame: 0, playing: false, speed: 1, selected: null,
-  dim: '2d', view: 'seance', live: null, // live: { drillId, step }
+  dim: '3d', voice: true, ana: null, view: 'seance', live: null, // live: { drillId, step }
 };
 
 // ---------- UI helpers ----------
@@ -78,6 +79,7 @@ async function boot() {
   if (!sid) { showFatal('Aucune séance disponible.', 'Le fichier sessions.json est vide.'); return; }
   sel.value = sid;
   await loadSession(sid, hash.get('r'));
+  await setDim('3d');
   $('#boot').classList.add('is-done');
   setTimeout(() => $('#boot').remove(), 500);
   maybeHelp();
@@ -109,6 +111,7 @@ async function loadSession(id, repId) {
 
 // ---------- Essai ----------
 function openRep(repId, { autoplay = false } = {}) {
+  if (preview) { preview.stop = true; tts.stop(); }
   const rep = state.repsById[String(repId)];
   if (!rep) return;
   if (state.view !== 'seance') setView('seance');
@@ -125,6 +128,8 @@ function openRep(repId, { autoplay = false } = {}) {
   panel.setSelected(state.selected);
   sessionTL.setActive(rep.id);
   renderBadge();
+  state.ana = analyzeRep(rep, track, state.session);
+  renderRouteCard();
   setFrame(0);
   history.replaceState(null, '', `#s=${state.session.id}&r=${rep.id}`);
   if (autoplay) play(); else pause();
@@ -149,6 +154,7 @@ function setFrame(f) {
 function play() {
   if (!state.rep) return;
   if (state.frame >= state.rep.nFrames - 1.001) setFrame(0);
+  if (state.frame < 1 && state.voice && state.ana?.speech && !tts.speaking() && !preview) announceRoutes();
   state.playing = true; playTL.setPlaying(true);
 }
 function pause() { state.playing = false; playTL.setPlaying(false); }
@@ -211,7 +217,7 @@ async function setDim(d) {
       view3dLoading = view3dLoading || import('./view3d.js');
       const mod = await view3dLoading;
       $('#field3d').hidden = false;
-      view3d = mod.createView3D($('#field3d'), { onSelectPlayer: id => select(id), onRoutes: renderRoutesList });
+      view3d = mod.createView3D($('#field3d'), { onSelectPlayer: id => select(id) });
       if (state.rep) {
         const track = state.tracking?.[String(state.rep.playId)] || state.tracking?.[String(state.rep.id)];
         view3d.setRep(state.rep, track, state.session);
@@ -230,9 +236,6 @@ async function setDim(d) {
   $('#field2d').hidden = d !== '2d';
   $('#field3d').hidden = d !== '3d';
   $('#camTools').hidden = d !== '3d';
-  if (d !== '3d') { $('#routesPanel').hidden = true; $('#placeLegend').hidden = true; }
-  const activeCam = document.querySelector('[data-cam].is-on')?.dataset.cam || 'top';
-  updateDroneBadge(d === '3d' ? activeCam : null);
   requestAnimationFrame(() => {
     if (d === '3d') { try { view3d.resize(); } catch (_) { /* */ } } else field2d.resize();
     setFrame(state.frame);
@@ -241,59 +244,77 @@ async function setDim(d) {
 document.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('[data-cam]').forEach(x => x.classList.toggle('is-on', x === b));
   try { view3d?.setCamera(b.dataset.cam); } catch (e) { console.warn(e); }
-  updateDroneBadge(b.dataset.cam);
 }));
-
-// Badge "Vue du drone" visible uniquement en vue du dessus (caméra drone) et en 3D.
-function updateDroneBadge(cam) {
-  const active = state.dim === '3d' && (cam === 'top');
-  const el = $('#droneBadge');
-  if (el) el.hidden = !active;
-}
-$('#ghostBtn').addEventListener('click', e => {
-  const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
-  e.currentTarget.setAttribute('aria-pressed', String(on));
-  e.currentTarget.classList.toggle('is-on', on);
-  try { view3d?.setGhost(on); } catch (err) { console.warn(err); }
+$('#voiceBtn').addEventListener('click', e => {
+  state.voice = !state.voice;
+  e.currentTarget.setAttribute('aria-pressed', String(state.voice));
+  e.currentTarget.classList.toggle('is-on', state.voice);
+  e.currentTarget.textContent = state.voice ? '🔊 Annonce' : '🔇 Annonce';
+  if (!state.voice) tts.stop();
 });
 
-// Toggle générique (aria-pressed + is-on) appliquant une méthode de la vue 3D.
-function wireToggle(sel, fn) {
-  const btn = $(sel);
-  if (!btn) return;
-  btn.addEventListener('click', e => {
-    const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
-    e.currentTarget.setAttribute('aria-pressed', String(on));
-    e.currentTarget.classList.toggle('is-on', on);
-    try { fn(on); } catch (err) { console.warn(err); }
+// ---------- Tracés : carte + annonce vocale ----------
+function renderRouteCard() {
+  const el = $('#routeCard'), a = state.ana;
+  if (!a || (!a.routes.length && !a.misplaced.length)) { el.hidden = true; return; }
+  const off = state.rep.side !== 'defense';
+  const li = (n, r, small, i) => `<li style="animation-delay:${(i * 0.06).toFixed(2)}s"><span class="n">${n}</span><span class="r">${r}</span>${small ? `<small>${esc(small)}</small>` : ''}</li>`;
+  el.innerHTML = `
+    <h4>${off ? 'Tracés de l’attaque' : `Tracés ${esc(state.session.opponent || 'adverses')}`}</h4>
+    <ul>${a.routes.map((t, i) => li(t.jersey != null ? '#' + t.jersey : '', esc(t.route), `${t.name} · ${t.hint}`, i)).join('')}</ul>
+    ${a.misplaced.length ? `<div class="rc-sec rc-bad"><h4 style="color:#f87171">Mal placés</h4><ul>${a.misplaced.map((b, i) => li('#' + (b.jersey ?? ''), esc(b.issue), b.name, i + a.routes.length)).join('')}</ul></div>` : ''}
+    <div class="rc-legend"><span><i style="border-color:#22c55e"></i>Bien placé</span><span><i style="border-color:#ef4444"></i>Mal placé</span></div>`;
+  el.hidden = false;
+  el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+}
+// Pré-tracés : avant le snap, chaque tracé se dessine sur le terrain pendant que la voix l'annonce.
+let preview = null;
+async function previewRoutes() {
+  const a = state.ana;
+  if (!a || !a.routes.length || !view3d) return;
+  if (preview) { preview.stop = true; return; }
+  const me = preview = { stop: false };
+  stopLive(); pause(); setFrame(0); tts.stop();
+  const btn = $('#previewBtn');
+  btn.classList.add('is-on'); btn.textContent = '■ Stop';
+  const items = [...$('#routeCard').querySelectorAll('li')];
+  view3d.revealRoute(null, 0);
+  const draw = (id, ms) => new Promise(res => {
+    const t0 = performance.now();
+    const tick = now => {
+      const k = Math.min(1, (now - t0) / ms);
+      view3d.revealRoute(id, 1 - Math.pow(1 - k, 3));
+      if (k < 1 && !me.stop) requestAnimationFrame(tick); else res();
+    };
+    requestAnimationFrame(tick);
   });
-}
-wireToggle('#bubbleBtn', on => view3d?.setBubbles(on));
-wireToggle('#misalignBtn', on => {
-  view3d?.setMisalign(on);
-  $('#placeLegend').hidden = !on;
-});
-wireToggle('#routesBtn', on => {
-  view3d?.setRoutes(on);
-  $('#routesPanel').hidden = !on;
-  if (on && view3d) renderRoutesList(view3d.getRoutes());
-});
-
-// Liste des tracés d'attaque (nom + joueur), alimentée par la vue 3D.
-function renderRoutesList(routes) {
-  const ul = $('#routesList');
-  if (!ul) return;
-  if (!routes || !routes.length) {
-    ul.innerHTML = '<li class="rt-empty">Aucun tracé sur cet essai (jeu au sol ou données manquantes).</li>';
-    return;
+  const say = text => (state.voice ? tts.speak(text, { id: 'preview', rate: 1.05 }) : wait(1400));
+  await say(state.rep.side !== 'defense' ? 'Pré-tracés de l’attaque.' : 'Pré-tracés adverses.');
+  for (let i = 0; i < a.routes.length && !me.stop; i++) {
+    const t = a.routes[i];
+    view3d.focusPlayer(t.id);
+    items.forEach((li, k) => li.classList.toggle('speaking', k === i));
+    await Promise.all([draw(t.id, 1300), say(`${t.jersey != null ? 'Numéro ' + t.jersey : t.name}, ${t.route}. Il ${t.hint}.`)]);
   }
-  ul.innerHTML = routes.map(r => `
-    <li>
-      <span class="rt-dot" style="background:${esc(r.color)}"></span>
-      <span class="rt-name">${esc(r.name)}</span>
-      <span class="rt-who">${r.jersey != null ? '#' + esc(r.jersey) : ''} ${esc(r.pos || '')}</span>
-      <span class="rt-depth">${esc(r.depth)} yd</span>
-    </li>`).join('');
+  for (let i = 0; i < a.misplaced.length && !me.stop; i++) {
+    const b = a.misplaced[i];
+    view3d.focusPlayer(b.id);
+    items.forEach((li, k) => li.classList.toggle('speaking', k === a.routes.length + i));
+    await say(`Attention, numéro ${b.jersey ?? ''}, ${b.issue}.`);
+  }
+  if (me.stop) tts.stop();
+  view3d.focusPlayer(null);
+  view3d.revealRoute(null, 1);
+  items.forEach(li => li.classList.remove('speaking'));
+  btn.classList.remove('is-on'); btn.textContent = '▶ Pré-tracés';
+  preview = null;
+  if (!me.stop) play();
+}
+$('#previewBtn').addEventListener('click', previewRoutes);
+
+function announceRoutes() {
+  if (!state.ana?.speech) return;
+  tts.speak(state.ana.speech, { id: 'routes', rate: 1.05 });
 }
 
 // ---------- Réglages ----------

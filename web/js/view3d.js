@@ -2,6 +2,53 @@
 // Repère: terrain (x, y) en yards -> three (X = x, Y = haut, Z = -y). 1 unité = 1 yard.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+import { analyzeRep } from "./analysis.js";
+
+// ---------------------------------------------------------------- modèles 3D (joueur FBX + drone OBJ), chargés une fois
+const MODEL_DIR = "models/american-football-player/";
+let assets = null;
+function loadAssets() {
+  if (assets) return assets;
+  const mgr = new THREE.LoadingManager();
+  // le FBX référence des chemins Windows absolus : on ne garde que le nom du fichier
+  mgr.setURLModifier((url) => {
+    const m = /([^\\/]+\.(png|jpe?g))$/i.exec(decodeURIComponent(url));
+    if (!m || url.startsWith("data:") || url.startsWith("blob:")) return url;
+    const alias = { "base4.jpg": "b.jpg", "normal.jpg": "n.jpg", "bump.jpg": "n.jpg", "bumpy.jpg": "n.jpg" };
+    return MODEL_DIR + "textures/" + (alias[m[1].toLowerCase()] || m[1]);
+  });
+  const player = new FBXLoader(mgr).loadAsync(MODEL_DIR + "source/3x.fbx").then((fbx) => {
+    const box = new THREE.Box3().setFromObject(fbx);
+    const h = box.max.y - box.min.y || 1;
+    const k = 2.15 / h; // ~1,95 m ≈ 2,15 yd avec casque
+    fbx.scale.setScalar(k);
+    fbx.position.y = -box.min.y * k;
+    fbx.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    const holder = new THREE.Group();
+    holder.add(fbx);
+    return { obj: holder, clips: fbx.animations || [] };
+  });
+  const drone = new MTLLoader().setPath("models/Drone/").loadAsync("Drone.mtl").then((mtl) => {
+    mtl.preload();
+    return new OBJLoader().setMaterials(mtl).setPath("models/Drone/").loadAsync("Drone.obj");
+  }).then((obj) => {
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    const k = 6 / Math.max(size.x, size.z, 0.001);
+    obj.scale.setScalar(k);
+    const c = box.getCenter(new THREE.Vector3());
+    obj.position.set(-c.x * k, -c.y * k, -c.z * k);
+    const g = new THREE.Group(); g.add(obj);
+    return g;
+  });
+  assets = { player: player.catch((e) => { console.warn("modèle joueur", e); return null; }),
+    drone: drone.catch((e) => { console.warn("modèle drone", e); return null; }) };
+  return assets;
+}
 
 const FIELD_L = 120;
 const FIELD_W = 53.3;
@@ -9,8 +56,7 @@ const OURS = "#d50a0a";
 const THEM = "#64748b";
 const GHOST = 0x22d3ee;
 const HASH_Y = 23.58;
-const SPR = 0.021; // taille écran des pastilles de numéro (plus petites pour voir les joueurs)
-// HASH_Y: distance des hash marks au bord (NFL)
+const SPR = 0.016; // taille écran des pastilles de numéro // distance des hash marks au bord (NFL)
 
 const W = (x, y, h = 0) => new THREE.Vector3(x, h, -y);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -172,107 +218,8 @@ function makeNumberTexture(jersey, color) {
   return t;
 }
 
-// ---------------------------------------------------------------- bulles d'explication
-// Crée une texture "bulle BD" avec un titre + une ligne de détail. Renvoie {tex, w, h}.
-function makeBubbleTexture(title, detail, { accent = "#38bdf8", warn = false } = {}) {
-  const DPR = 2;
-  const padX = 26, padY = 16, tail = 20;
-  const fTitle = 34, fDetail = 26, gap = 8;
-  const mc = document.createElement("canvas").getContext("2d");
-  mc.font = `800 ${fTitle}px "Barlow Condensed", system-ui, sans-serif`;
-  const wTitle = mc.measureText(title || "").width;
-  mc.font = `600 ${fDetail}px Barlow, system-ui, sans-serif`;
-  const wDetail = detail ? mc.measureText(detail).width : 0;
-  const innerW = Math.max(wTitle, wDetail, 60);
-  const bw = Math.ceil(innerW + padX * 2);
-  const bh = Math.ceil(fTitle + (detail ? gap + fDetail : 0) + padY * 2);
-  const W = bw, H = bh + tail;
-  const c = document.createElement("canvas");
-  c.width = W * DPR; c.height = H * DPR;
-  const g = c.getContext("2d");
-  g.scale(DPR, DPR);
-  // corps arrondi
-  const r = 14;
-  g.beginPath();
-  g.moveTo(r, 0);
-  g.arcTo(bw, 0, bw, bh, r); g.arcTo(bw, bh, 0, bh, r);
-  g.arcTo(0, bh, 0, 0, r); g.arcTo(0, 0, bw, 0, r);
-  g.closePath();
-  // queue (triangle vers le bas)
-  g.moveTo(bw / 2 - tail * 0.6, bh);
-  g.lineTo(bw / 2, bh + tail);
-  g.lineTo(bw / 2 + tail * 0.6, bh);
-  g.fillStyle = warn ? "rgba(69, 10, 10, 0.92)" : "rgba(8, 15, 28, 0.92)";
-  g.fill();
-  g.lineWidth = 2.5;
-  g.strokeStyle = warn ? "#f87171" : accent;
-  g.stroke();
-  // textes
-  g.textAlign = "center";
-  g.fillStyle = warn ? "#fecaca" : "#fff";
-  g.font = `800 ${fTitle}px "Barlow Condensed", system-ui, sans-serif`;
-  g.textBaseline = "top";
-  g.fillText(title || "", bw / 2, padY);
-  if (detail) {
-    g.fillStyle = warn ? "#fca5a5" : "#cbd5e1";
-    g.font = `600 ${fDetail}px Barlow, system-ui, sans-serif`;
-    g.fillText(detail, bw / 2, padY + fTitle + gap);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return { tex, w: W, h: H };
-}
-
-// Devine le type de tracé (route) à partir de la trajectoire post-snap, repère TB (attaque vers +x).
-// Renvoie { name, depth } ; name parmi la nomenclature NFL classique.
-function classifyRoute(data, snapIdx) {
-  if (!Array.isArray(data)) return null;
-  const snap = sample(data, snapIdx);
-  if (!snap) return null;
-  const pts = [];
-  for (let i = snapIdx; i < data.length; i++) if (validRow(data[i])) pts.push({ x: data[i][0], y: data[i][1] });
-  if (pts.length < 3) return null;
-  const start = pts[0];
-  let depth = 0, maxLat = 0, endLat = 0;
-  for (const p of pts) {
-    depth = Math.max(depth, p.x - start.x);
-    if (Math.abs(p.y - start.y) > Math.abs(maxLat)) maxLat = p.y - start.y;
-  }
-  const end = pts[pts.length - 1];
-  endLat = end.y - start.y;
-  const endDepth = end.x - start.x;
-  const lateSide = Math.sign(maxLat) || 1;
-  // Direction du départ du terrain (vers quel bord) pour nommer in/out
-  const toOut = Math.abs(start.y - FIELD_W / 2) < FIELD_W / 2 ? (start.y > FIELD_W / 2 ? 1 : -1) : 1;
-  const breaksOut = Math.sign(endLat) === toOut;
-  let name;
-  if (depth < 1.5 && Math.abs(maxLat) < 2) name = "Screen";
-  else if (depth < 4 && Math.abs(maxLat) >= 3) name = "Slant";
-  else if (depth >= 16 && Math.abs(endLat) < 5) name = "Go / Fly";
-  else if (depth >= 10 && Math.abs(endLat) >= 6 && !breaksOut) name = "Post";
-  else if (depth >= 10 && Math.abs(endLat) >= 6 && breaksOut) name = "Corner";
-  else if (Math.abs(endLat) >= 5 && endDepth < depth - 2) name = breaksOut ? "Out" : "In / Dig";
-  else if (endDepth < depth - 2 && Math.abs(endLat) < 5) name = "Curl / Comeback";
-  else if (depth >= 4 && depth < 10 && Math.abs(maxLat) >= 4) name = breaksOut ? "Out" : "In";
-  else if (depth < 7) name = "Hitch";
-  else name = "Seam";
-  return { name, depth: Math.round(depth * 10) / 10, lateSide };
-}
-
-// Phrase courte "ce qu'il fait" selon le rôle, pour la bulle.
-function roleAction(role, pos) {
-  switch (role) {
-    case "Pass": return "Fait la passe";
-    case "Pass Block": return "Protège le QB";
-    case "Pass Route": return "Part en route";
-    case "Pass Rush": return "Rush le passeur";
-    case "Coverage": return "Couvre son homme";
-    default: return pos ? pos : "En action";
-  }
-}
-
-export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
+// ---------------------------------------------------------------- module
+export function createView3D(container, { onSelectPlayer } = {}) {
   const root = document.createElement("div");
   root.className = "v3d-root";
   container.appendChild(root);
@@ -299,6 +246,16 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
   camera.position.set(50, 60, 20);
   const camTarget = new THREE.Vector3(60, 0, -FIELD_W / 2);
   camera.lookAt(camTarget);
+
+  const drone = new THREE.PerspectiveCamera(50, 1.6, 0.1, 400);
+  let droneOn = true;
+  const bubbles = document.createElement("div");
+  bubbles.className = "v3d-bubbles";
+  root.appendChild(bubbles);
+  const droneBox = document.createElement("div");
+  droneBox.className = "v3d-drone";
+  droneBox.innerHTML = '<span class="v3d-drone-tag"><i></i>Vue du drone</span>';
+  root.appendChild(droneBox);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -408,8 +365,12 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
     ring: new THREE.RingGeometry(0.78, 1.0, 56),
     disc: new THREE.CircleGeometry(0.78, 40),
     ball: new THREE.SphereGeometry(1, 20, 14),
-    mark: new THREE.PlaneGeometry(1.7, 1.7),
-    markEdge: new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.7, 1.7)),
+    square: (() => {
+      const sh = new THREE.Shape([[-0.9, -0.9], [0.9, -0.9], [0.9, 0.9], [-0.9, 0.9]].map(([x, y]) => new THREE.Vector2(x, y)));
+      sh.holes.push(new THREE.Path([[-0.7, -0.7], [-0.7, 0.7], [0.7, 0.7], [0.7, -0.7]].map(([x, y]) => new THREE.Vector2(x, y))));
+      return new THREE.ShapeGeometry(sh);
+    })(),
+    squareFill: new THREE.PlaneGeometry(1.4, 1.4),
   };
   const mkMats = (jersey, pants, helmet) => ({
     jersey: new THREE.MeshStandardMaterial({ color: jersey, roughness: 0.65 }),
@@ -429,11 +390,13 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
     trail: new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.75, depthWrite: false }),
     trailPast: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false }),
     ball: new THREE.MeshStandardMaterial({ color: 0x7a3b12, roughness: 0.55 }),
+    sqOk: new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }),
+    sqBad: new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }),
+    sqOkFill: new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.18, depthWrite: false }),
+    sqBadFill: new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.25, depthWrite: false }),
+    route: new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.55, depthWrite: false }),
+    routeThem: new THREE.MeshBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.45, depthWrite: false }),
     dash: new THREE.LineDashedMaterial({ color: GHOST, dashSize: 0.45, gapSize: 0.3, transparent: true, opacity: 0.9 }),
-    markOkFill: new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
-    markOkEdge: new THREE.LineBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.95 }),
-    markBadFill: new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide }),
-    markBadEdge: new THREE.LineBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.98 }),
   };
 
   function buildAvatar(mats, { ghost = false } = {}) {
@@ -484,16 +447,11 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
   let passF = -1, passA = -1;
   let losX = 60, ballSnapY = FIELD_W / 2;
   let selected = null;
-  let preset = "top";
+  let preset = "madden";
+  let ana = { players: {}, routes: [], misplaced: [] };
+  let routeMeshes = [];
   let ghostOn = false;
   let snapCam = true;
-  let bubblesOn = false;
-  let routesOn = false;
-  let misalignOn = false;
-  const routesGroup = new THREE.Group();
-  scene.add(routesGroup);
-  let routeList = []; // [{id, name, depth, ours}]
-  let misaligned = new Map(); // id -> {dx, dy, label}
 
   const selGroup = new THREE.Group();
   const ring = new THREE.Mesh(G.ring, M.ring);
@@ -527,24 +485,17 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
     for (const p of players.values()) {
       if (p.tex) p.tex.dispose();
       if (p.sprite) p.sprite.material.dispose();
-      if (p.bubbleTex) p.bubbleTex.dispose();
-      if (p.bubble) p.bubble.material.dispose();
     }
     for (const gh of ghosts.values()) if (gh.lineGeo) gh.lineGeo.dispose();
-    clearRoutes();
     disposeObj(dyn);
     dyn.clear();
     players = new Map();
     ghosts = new Map();
     ball = null;
     clearTrail();
-  }
-  function clearRoutes() {
-    for (const o of routesGroup.children) {
-      if (o.geometry) o.geometry.dispose();
-      if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
-    }
-    routesGroup.clear();
+    for (const m of routeMeshes) { m.geometry.dispose(); scene.remove(m); }
+    routeMeshes = [];
+    bubbles.innerHTML = "";
   }
   function clearTrail() {
     for (const t of [trail, trailPast]) {
@@ -562,6 +513,7 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
   function setRep(r, t, s) {
     clearDynamic();
     rep = r || null; track = t || null; session = s || null;
+    ana = analyzeRep(rep, track, session);
     const pl = (track && track.players) || {};
     ballData = track && Array.isArray(track.ball) ? track.ball : null;
     ballXY = null;
@@ -598,34 +550,36 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
       sprite.position.y = 2.75;
       sprite.renderOrder = 5;
       av.yaw.add(sprite);
-      // bulle d'explication (sprite séparé, ajouté à dyn pour rester face caméra sans tourner avec le joueur)
-      const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ depthWrite: false, depthTest: false,
-        transparent: true, sizeAttenuation: true, opacity: 0 }));
-      bubble.renderOrder = 7;
-      bubble.visible = false;
-      dyn.add(bubble);
-      // carré de placement au sol (vert = bien placé, rouge = mal placé) — pour les joueurs TB
-      let mark = null;
-      if (ours) {
-        mark = new THREE.Group();
-        const fill = new THREE.Mesh(G.mark, M.markOkFill);
-        const edge = new THREE.LineSegments(G.markEdge, M.markOkEdge);
-        fill.rotation.x = -Math.PI / 2; fill.position.y = 0.05; fill.renderOrder = 3;
-        edge.rotation.x = -Math.PI / 2; edge.position.y = 0.06; edge.renderOrder = 4;
-        mark.add(fill, edge);
-        mark.userData = { fill, edge };
-        mark.visible = false;
-        dyn.add(mark);
-      }
       dyn.add(av.yaw);
-      players.set(String(id), { id: String(id), ours, data, av, hit, sprite, tex, bubble, bubbleTex: null,
-        bubbleKey: null, mark, phase: Math.random() * 6 });
+      const a = ana.players[id] || {};
+      const off = a.offset || null;
+      let sq = null;
+      if (typeof a.ok === "boolean") {
+        sq = new THREE.Group();
+        const edge = new THREE.Mesh(G.square, a.ok ? M.sqOk : M.sqBad);
+        const fillM = new THREE.Mesh(G.squareFill, a.ok ? M.sqOkFill : M.sqBadFill);
+        for (const m of [edge, fillM]) { m.rotation.x = -Math.PI / 2; m.renderOrder = 3; sq.add(m); }
+        edge.position.y = 0.05; fillM.position.y = 0.04;
+        dyn.add(sq);
+      }
+      let bub = null;
+      const info2 = playerInfo(id);
+      const jn = info2 && info2.jersey != null ? "#" + info2.jersey : "";
+      if (a.route || a.ok === false) {
+        bub = document.createElement("div");
+        bub.className = "v3d-bub " + (a.ok === false ? "bad" : ours ? "ours" : "them");
+        const ln = info2 && info2.name ? info2.name.split(" ").slice(-1)[0] : "";
+        bub.innerHTML = a.ok === false
+          ? `<b>${jn} ${ln}</b><span>Mal placé · ${a.issue}</span>`
+          : `<b>${jn} ${ln}</b><span>${a.route}</span>`;
+        bub.style.animationDelay = `${(bubbles.children.length * 0.08).toFixed(2)}s`;
+        bubbles.appendChild(bub);
+      }
+      if (bub || sq) sprite.visible = false;
+      players.set(String(id), { id: String(id), ours, data, av, hit, sprite, tex, phase: Math.random() * 6, off, sq, bub, hideSprite: !!(bub || sq) });
     }
-
-    // --- tracés d'attaque (routes) : classer + préparer les lignes au sol
-    computeRoutes();
-    // --- mauvais placement aléatoire (déterministe par essai) : décale l'alignement pré-snap de certains TB
-    computeMisalign();
+    buildRoutes();
+    applyModels();
     // fantômes (TB seulement)
     for (const p of players.values()) {
       if (!p.ours) continue;
@@ -675,109 +629,74 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
     scene.add(trail);
   }
 
-  // ------------------------------------------------------------ tracés d'attaque (routes)
-  const ROUTE_COLORS = {
-    "Go / Fly": 0x38bdf8, "Post": 0xa78bfa, "Corner": 0xf472b6, "Out": 0xfbbf24,
-    "In / Dig": 0x34d399, "In": 0x34d399, "Slant": 0xf87171, "Curl / Comeback": 0xfb923c,
-    "Hitch": 0x60a5fa, "Seam": 0x22d3ee, "Screen": 0x94a3b8,
-  };
-  function routeColor(name) { return ROUTE_COLORS[name] != null ? ROUTE_COLORS[name] : 0xfacc15; }
-
-  function computeRoutes() {
-    routeList = [];
+  let playerAsset = null;
+  const mixers = [];
+  function applyModels() {
+    if (!playerAsset) return;
+    mixers.length = 0;
     for (const p of players.values()) {
-      if (!p.ours) continue;
-      if (repRole(p.id) !== "Pass Route") continue;
-      const r = classifyRoute(p.data, snapIdx);
-      if (!r) continue;
-      const info = playerInfo(p.id);
-      routeList.push({ id: p.id, name: r.name, depth: r.depth, color: routeColor(r.name),
-        jersey: info ? info.jersey : null, playerName: info ? info.name : null, pos: (rep && rep.players && rep.players[p.id] && rep.players[p.id].pos) || (info && info.position) });
+      if (p.model) continue;
+      const m = SkeletonUtils.clone(playerAsset.obj);
+      const tint = new THREE.Color(p.ours ? 0xff6b6b : 0x9fb3d1);
+      m.traverse((o) => {
+        if (o.isMesh) o.material = (Array.isArray(o.material) ? o.material : [o.material]).map((mt) => {
+          const c = mt.clone(); c.color = tint; return c;
+        });
+      });
+      p.av.yaw.add(m);
+      p.av.body.visible = false;
+      p.model = m;
+      if (playerAsset.clips.length) {
+        const mx = new THREE.AnimationMixer(m);
+        const act = mx.clipAction(playerAsset.clips[0]); act.time = Math.random() * 2; act.play();
+        mixers.push(mx);
+      }
     }
-    routeList.sort((a, b) => b.depth - a.depth);
-    if (typeof onRoutes === "function") onRoutes(routeList.map((r) => ({ ...r, color: "#" + r.color.toString(16).padStart(6, "0") })));
-    drawRoutes();
   }
+  let droneMesh = null, droneBeam = null;
+  const A = loadAssets();
+  A.player.then((a) => { if (disposed || !a) return; playerAsset = a; applyModels(); });
+  A.drone.then((d) => {
+    if (disposed || !d) return;
+    droneMesh = d.clone();
+    const red = new THREE.MeshStandardMaterial({ color: 0xd50a0a, roughness: 0.35, metalness: 0.3, emissive: 0x3a0000 });
+    droneMesh.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.material = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => (/glass/i.test(m.name) ? m : red));
+    });
+    // faisceau « caméra » du drone vers le terrain + petit spot pour qu'on le repère
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(6, 1, 40, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide }));
+    beam.renderOrder = 4;
+    droneBeam = beam;
+    scene.add(droneMesh, beam);
+    const glow = new THREE.PointLight(0xff3b3b, 8, 12);
+    glow.position.y = -0.6;
+    droneMesh.add(glow);
+  });
 
-  function drawRoutes() {
-    clearRoutes();
-    if (!routesOn) return;
-    for (const r of routeList) {
-      const p = players.get(r.id);
+  function buildRoutes() {
+    const snap = snapIdx;
+    for (const t of ana.routes) {
+      const p = players.get(String(t.id));
       if (!p) continue;
       const pts = [];
-      for (let i = snapIdx; i < p.data.length; i++) {
-        const row = p.data[i];
-        if (validRow(row)) {
-          const v = W(row[0], row[1], 0.08);
-          if (!pts.length || pts[pts.length - 1].distanceToSquared(v) > 0.01) pts.push(v);
-        }
+      for (let i = snap; i < p.data.length; i++) {
+        const r = p.data[i];
+        if (!validRow(r)) continue;
+        const v = W(r[0] + (p.off ? p.off.dx : 0), r[1] + (p.off ? p.off.dy : 0), 0.07);
+        if (!pts.length || pts[pts.length - 1].distanceToSquared(v) > 0.04) pts.push(v);
       }
       if (pts.length < 2) continue;
-      const curve = new THREE.CatmullRomCurve3(pts);
-      const tube = new THREE.Mesh(
-        new THREE.TubeGeometry(curve, Math.min(220, pts.length * 3), 0.11, 6, false),
-        new THREE.MeshBasicMaterial({ color: r.color, transparent: true, opacity: 0.9, depthWrite: false })
-      );
-      tube.renderOrder = 2;
-      routesGroup.add(tube);
-      // pointe de flèche en bout de route
-      const end = pts[pts.length - 1], prev = pts[Math.max(0, pts.length - 4)];
-      const head = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.9, 10),
-        new THREE.MeshBasicMaterial({ color: r.color, depthWrite: false }));
-      head.position.copy(end);
-      head.position.y = 0.4;
-      const dir = new THREE.Vector3().subVectors(end, prev).setY(0);
-      if (dir.lengthSq() > 1e-4) {
-        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
-        head.quaternion.copy(q);
-      }
-      head.renderOrder = 3;
-      routesGroup.add(head);
-      // étiquette du nom de tracé
-      const { tex, w, h } = makeBubbleTexture(r.name, null, { accent: "#" + r.color.toString(16).padStart(6, "0") });
-      const lbl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, depthTest: false, transparent: true }));
-      const sc = 0.012;
-      lbl.scale.set(w * sc, h * sc, 1);
-      lbl.position.copy(end); lbl.position.y = 1.4;
-      lbl.renderOrder = 8;
-      routesGroup.add(lbl);
+      const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), Math.min(300, pts.length * 3), 0.11, 5, false),
+        t.ours ? M.route : M.routeThem);
+      m.renderOrder = 2;
+      m.userData.id = String(t.id);
+      m.userData.full = m.geometry.index.count;
+      scene.add(m);
+      routeMeshes.push(m);
     }
-  }
-
-  // ------------------------------------------------------------ mauvais placement aléatoire
-  // Hash déterministe (essai + joueur) -> toujours le même résultat pour un même essai.
-  function hashStr(s) {
-    let h = 2166136261;
-    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-    return (h >>> 0) / 4294967296;
-  }
-  function computeMisalign() {
-    misaligned = new Map();
-    const repId = rep && rep.id != null ? String(rep.id) : "0";
-    for (const p of players.values()) {
-      if (!p.ours) continue;
-      const role = repRole(p.id);
-      if (role !== "Pass Route" && role !== "Pass Block") continue;
-      const h = hashStr(repId + ":" + p.id);
-      if (h > 0.28) continue; // ~28% des éligibles sont "mal placés"
-      const a = hashStr("a" + repId + p.id), b = hashStr("b" + repId + p.id);
-      const dx = (a - 0.5) * 2.4;            // décalage avant/arrière (yards)
-      const dy = (b - 0.5) * 3.2;            // décalage latéral (yards)
-      let label;
-      if (role === "Pass Block") label = Math.abs(dx) > Math.abs(dy) ? "Mauvais recul" : "Split trop large";
-      else label = dx < -0.4 ? "En retard sur la ligne" : Math.abs(dy) > 1 ? "Alignement décalé" : "Mal aligné";
-      misaligned.set(p.id, { dx, dy, label });
-    }
-  }
-  function misalignOffset(p, f) {
-    if (!misalignOn) return null;
-    const m = misaligned.get(p.id);
-    if (!m) return null;
-    // Le décalage est plein avant le snap, puis se résorbe sur ~1s après le snap.
-    let k = 1;
-    if (f > snapIdx) k = clamp(1 - (f - snapIdx) / 10, 0, 1);
-    return { dx: m.dx * k, dy: m.dy * k, label: m.label, active: k > 0.15 };
   }
 
   // ------------------------------------------------------------ mise à jour par frame
@@ -806,14 +725,12 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
   const tmpV = new THREE.Vector3();
   function placePlayer(p, f, df) {
     const st = sample(p.data, f);
-    if (!st) { p.av.yaw.visible = false; p.cur = null; return; }
+    if (!st) { p.av.yaw.visible = false; p.cur = null; if (p.sq) p.sq.visible = false; return; }
     p.av.yaw.visible = true;
-    const mo = misalignOffset(p, f);
-    const px = st.x + (mo ? mo.dx : 0);
-    const py = st.y + (mo ? mo.dy : 0);
-    p.cur = { x: px, y: py, s: st.s, o: st.o };
-    p.misalign = mo && mo.active ? mo.label : null;
-    p.av.yaw.position.copy(W(px, py));
+    if (p.off) { st.x += p.off.dx; st.y += p.off.dy; }
+    p.cur = st;
+    if (p.sq) { p.sq.visible = true; p.sq.position.set(st.x, 0, -st.y); }
+    p.av.yaw.position.copy(W(st.x, st.y));
     const o = st.o == null ? 90 : st.o;
     p.av.yaw.rotation.y = Math.PI - THREE.MathUtils.degToRad(o);
     const s = st.s;
@@ -897,66 +814,6 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
       p.sprite.scale.set(k, k, 1);
       p.sprite.renderOrder = sp === p ? 6 : 5;
     }
-    updateBubbles();
-    updateMarks();
-  }
-
-  // Carrés de placement au sol : vert = bien placé, rouge = mal placé (visibles si "Mauvais placement" actif).
-  function updateMarks() {
-    for (const p of players.values()) {
-      if (!p.mark) continue;
-      const show = misalignOn && p.cur && p.av.yaw.visible;
-      p.mark.visible = !!show;
-      if (!show) continue;
-      p.mark.position.set(p.cur.x, 0, -p.cur.y);
-      const bad = !!p.misalign;
-      p.mark.userData.fill.material = bad ? M.markBadFill : M.markOkFill;
-      p.mark.userData.edge.material = bad ? M.markBadEdge : M.markOkEdge;
-      // légère pulsation sur les mal placés pour attirer l'œil du jury
-      const k = bad ? 1 + Math.sin(t * 5) * 0.08 : 1;
-      p.mark.scale.set(k, k, k);
-    }
-  }
-
-  // Met à jour le contenu + la position des bulles d'explication au-dessus des joueurs.
-  function updateBubbles() {
-    for (const p of players.values()) {
-      const show = bubblesOn && p.cur && p.av.yaw.visible;
-      if (!show) { if (p.bubble.visible) { p.bubble.visible = false; } continue; }
-      const role = repRole(p.id);
-      const info = playerInfo(p.id);
-      const warn = !!p.misalign;
-      // titre: action ou alerte de placement ; détail: numéro/poste ou route
-      let title, detail;
-      if (warn) {
-        title = p.misalign;
-        detail = info ? `#${info.jersey} · ${(rep && rep.players && rep.players[p.id] && rep.players[p.id].pos) || info.position || ""}` : "";
-      } else {
-        title = roleAction(role, info && info.position);
-        if (role === "Pass Route") {
-          const r = routeList.find((x) => x.id === p.id);
-          detail = r ? `Tracé : ${r.name}` : (info ? `#${info.jersey}` : "");
-        } else {
-          detail = info ? `#${info.jersey} ${info.name || ""}`.trim() : "";
-        }
-      }
-      const key = (warn ? "W|" : "") + title + "|" + detail;
-      if (key !== p.bubbleKey) {
-        if (p.bubbleTex) p.bubbleTex.dispose();
-        const accent = p.ours ? "#f87171" : "#38bdf8";
-        const { tex, w, h } = makeBubbleTexture(title, detail, { warn, accent: warn ? undefined : (p.ours ? "#fb7185" : "#38bdf8") });
-        p.bubble.material.map = tex;
-        p.bubble.material.needsUpdate = true;
-        p.bubbleTex = tex;
-        p.bubbleKey = key;
-        const sc = 0.011;
-        p.bubble.scale.set(w * sc, h * sc, 1);
-        p.bubble.userData.aspect = { w: w * sc, h: h * sc };
-      }
-      p.bubble.visible = true;
-      p.bubble.material.opacity = 1;
-      p.bubble.position.set(p.cur.x, 3.4 + p.bubble.userData.aspect.h / 2, -p.cur.y);
-    }
   }
   // pastilles: s'effacent quand la caméra est tout près (vues à hauteur d'homme)
   const sprW = new THREE.Vector3();
@@ -965,11 +822,11 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
       p.sprite.getWorldPosition(sprW);
       const d = sprW.distanceTo(camera.position);
       p.sprite.material.opacity = clamp((d - 3) / 4, 0, 1);
-      p.sprite.visible = p.sprite.material.opacity > 0.02;
+      p.sprite.visible = !p.hideSprite && p.sprite.material.opacity > 0.02;
       // avatar collé à la caméra: on le masque pour ne pas boucher la vue
       if (p.cur) {
         const near = Math.hypot(camera.position.x - p.cur.x, camera.position.z + p.cur.y) < 2.2 && camera.position.y < 4;
-        p.av.body.visible = !near;
+        if (p.model) p.model.visible = !near; else p.av.body.visible = !near;
       }
     }
     for (const gh of ghosts.values()) {
@@ -1043,35 +900,22 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
         }
         break;
       }
-      case "free":
-        return false;
       case "madden": {
-        // Caméra broadcast style Madden : haute, sur la touche, qui suit l'action le long du terrain.
-        const act = actionCenter();
-        // lissage du suivi horizontal
-        maddenX += (act.x - maddenX) * 0.12;
-        const lead = clamp((act.x - losX) * 0.25, -6, 6); // anticipe la progression
-        desiredPos.copy(W(maddenX - 4 + lead, -16, 17));   // derrière la touche basse (y<0), en hauteur
-        desiredTgt.copy(W(maddenX + 6, cy - 4, 1.2));
+        // caméra « broadcast jeu vidéo » : derrière l'attaque, en hauteur, suit le ballon
+        const bx = ball && ball.visible ? ball.position.x : losX;
+        const fx = Math.max(losX, Math.min(bx, losX + 25));
+        desiredPos.copy(W(fx - 21, ballSnapY * 0.5 + cy * 0.5, 15));
+        desiredTgt.copy(W(fx + 10, ballSnapY * 0.5 + cy * 0.5, 0));
         break;
       }
+      case "free":
+        return false;
       case "top":
       default:
         desiredPos.copy(W(losX + 6, cy - 13, 46));
         desiredTgt.copy(W(losX + 6, cy, 0));
     }
     return true;
-  }
-
-  // Barycentre de l'action pour la caméra Madden (ballon sinon moyenne des joueurs visibles).
-  let maddenX = 60;
-  function actionCenter() {
-    const rows = ballRows();
-    const b = rows ? sample(rows, frame) : null;
-    if (b) return { x: b.x, y: b.y };
-    let sx = 0, sy = 0, n = 0;
-    for (const p of players.values()) if (p.cur) { sx += p.cur.x; sy += p.cur.y; n++; }
-    return n ? { x: sx / n, y: sy / n } : { x: losX, y: FIELD_W / 2 };
   }
 
   // ------------------------------------------------------------ boucle
@@ -1107,8 +951,59 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
     // ombres centrées sur l'action
     sun.target.position.set(losX + 5, 0, -FIELD_W / 2);
     sun.position.set(losX - 25, 70, 25);
+    for (const mx of mixers) mx.update(dt);
+    if (droneMesh) {
+      // le drone survole l'action : visible depuis la caméra Madden
+      const dh = 7 + Math.sin(t * 0.9) * 0.4;
+      droneMesh.position.set(losX + 1 + Math.sin(t * 0.25) * 1.2, dh, -(ballSnapY + 5) + Math.sin(t * 0.4) * 1);
+      droneMesh.rotation.set(Math.sin(t * 0.7) * 0.05, Math.PI / 2 + Math.sin(t * 0.3) * 0.15, Math.cos(t * 0.6) * 0.05);
+      if (droneBeam) {
+        droneBeam.scale.set(1, dh - 0.3, 1);
+        droneBeam.position.set(droneMesh.position.x, (dh - 0.3) / 2, droneMesh.position.z);
+        droneBeam.material.opacity = 0.07 + Math.sin(t * 2) * 0.025;
+      }
+    }
     fadeSprites();
+    const w = root.clientWidth, h = root.clientHeight;
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, w, h);
     renderer.render(scene, camera);
+    placeBubbles(w, h);
+    // vue du drone (encart en haut à droite)
+    if (droneOn && w > 360) {
+      const dw = Math.round(Math.min(300, w * 0.3)), dh = Math.round(dw * 0.62);
+      const m = 12, x = w - dw - m, y = h - dh - 56;
+      drone.aspect = dw / dh; drone.updateProjectionMatrix();
+      const hover = Math.sin(t * 0.9) * 0.6;
+      drone.position.set(losX + 8 + Math.sin(t * 0.25) * 2, 42 + hover, -FIELD_W / 2 + 14);
+      drone.lookAt(losX + 8, 0, -FIELD_W / 2);
+      renderer.setScissorTest(true);
+      renderer.setScissor(x, y, dw, dh);
+      renderer.setViewport(x, y, dw, dh);
+      const fog = scene.fog; scene.fog = null;
+      for (const p of players.values()) p.sprite.visible = false;
+      renderer.render(scene, drone);
+      scene.fog = fog;
+      renderer.setScissorTest(false);
+      droneBox.style.width = dw + "px"; droneBox.style.height = dh + "px";
+      droneBox.hidden = false;
+    } else droneBox.hidden = true;
+  }
+
+  const projV = new THREE.Vector3();
+  function placeBubbles(w, h) {
+    const dr = droneBox.hidden ? null : { x0: w - droneBox.offsetWidth - 20, y1: droneBox.offsetHeight + 64 };
+    for (const p of players.values()) {
+      if (!p.bub) continue;
+      if (!p.cur || !p.av.yaw.visible) { p.bub.style.display = "none"; continue; }
+      projV.set(p.cur.x, 3.1, -p.cur.y).project(camera);
+      const sx = (projV.x * 0.5 + 0.5) * w, sy = (-projV.y * 0.5 + 0.5) * h;
+      const inDrone = dr && sx > dr.x0 && sy < dr.y1;
+      if (projV.z > 1 || sx < -50 || sx > w + 50 || sy < -20 || sy > h + 20 || inDrone) { p.bub.style.display = "none"; continue; }
+      p.bub.style.display = "";
+      p.bub.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -100%)`;
+      p.bub.style.zIndex = String(1000 - Math.round(projV.z * 900));
+    }
   }
 
   // ------------------------------------------------------------ interactions
@@ -1189,30 +1084,14 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
     update(0);
   }
   function setCamera(p) {
-    const valid = ["top", "qb", "line", "receiver", "free", "madden"];
-    const next = valid.includes(p) ? p : "top";
+    const valid = ["madden", "top", "qb", "line", "receiver", "free"];
+    const next = valid.includes(p) ? p : "madden";
     if (next === "free") controls.target.copy(camTarget);
-    if (next === "madden") { maddenX = actionCenter().x; snapCam = true; }
     preset = next;
   }
   function setGhost(b) {
     ghostOn = !!b;
     update(0);
-  }
-  function setBubbles(b) {
-    bubblesOn = !!b;
-    update(0);
-  }
-  function setRoutes(b) {
-    routesOn = !!b;
-    drawRoutes();
-  }
-  function setMisalign(b) {
-    misalignOn = !!b;
-    update(0);
-  }
-  function getRoutes() {
-    return routeList.map((r) => ({ ...r, color: "#" + r.color.toString(16).padStart(6, "0") }));
   }
   let disposed = false;
   function dispose() {
@@ -1244,5 +1123,20 @@ export function createView3D(container, { onSelectPlayer, onRoutes } = {}) {
     root.remove();
   }
 
-  return { setRep, setFrame, setSelected, setCamera, setGhost, setBubbles, setRoutes, setMisalign, getRoutes, resize, dispose };
+  function setDrone(b) { droneOn = !!b; }
+  // pré-tracés : dévoile progressivement la route d'un joueur (frac 0..1), ou de tous si id == null
+  function revealRoute(id, frac) {
+    for (const m of routeMeshes) {
+      if (id != null && m.userData.id !== String(id)) continue;
+      const n = Math.floor((m.userData.full * clamp(frac, 0, 1)) / 3) * 3;
+      m.geometry.setDrawRange(0, n);
+      m.visible = n > 0;
+    }
+  }
+  function focusPlayer(id) {
+    for (const p of players.values()) if (p.bub) p.bub.classList.toggle("focus", id != null && p.id === String(id));
+    bubbles.classList.toggle("has-focus", id != null);
+  }
+  function getAnalysis() { return ana; }
+  return { setRep, setFrame, setSelected, setCamera, setGhost, setDrone, getAnalysis, revealRoute, focusPlayer, resize, dispose };
 }

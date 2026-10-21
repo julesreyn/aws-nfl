@@ -440,3 +440,23 @@ code { font-family: ui-monospace, Menlo, monospace; background: var(--panel-2); 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
+
+/* carte des tracés (bas gauche du terrain) */
+.route-card { position: absolute; left: 14px; bottom: 14px; z-index: 4; width: 210px; max-height: 48%; overflow: auto;
+  padding: 12px 14px; border-radius: 12px; background: rgba(10, 15, 28, .88); border: 1px solid rgba(255,255,255,.1);
+  backdrop-filter: blur(6px); color: #f1f5f9; animation: rcIn .5s ease both; }
+.route-card h4 { margin: 0 0 8px; font: 800 15px/1 "Barlow Condensed", sans-serif; letter-spacing: .05em; text-transform: uppercase; color: #facc15; }
+.route-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.route-card li { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 6px; font: 500 13px/1.2 "Barlow", sans-serif;
+  animation: rcItem .4s ease both; }
+.route-card li .n { font: 800 14px "Barlow Condensed", sans-serif; color: #fca5a5; }
+.route-card li .r { font: 800 14px "Barlow Condensed", sans-serif; text-transform: uppercase; color: #facc15; }
+.route-card li small { display: none; }
+.route-card li:hover small { display: block; grid-column: 2 / 4; color: #94a3b8; font-size: 11px; margin-top: -3px; }
+.route-card .rc-sec { margin-top: 10px; }
+.route-card .rc-bad li .r { color: #f87171; text-transform: none; font-size: 12px; }
+.route-card .rc-legend { display: flex; gap: 12px; margin-top: 10px; font-size: 11px; color: #cbd5e1; }
+.route-card .rc-legend i { display: inline-block; width: 10px; height: 10px; border: 2px solid; margin-right: 4px; vertical-align: -1px; }
+.route-card li.speaking { background: rgba(250,204,21,.12); border-radius: 6px; }
+@keyframes rcIn { from { opacity: 0; transform: translateX(-16px); } }
+@keyframes rcItem { from { opacity: 0; transform: translateY(6px); } }
