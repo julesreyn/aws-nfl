@@ -38,7 +38,7 @@ function loadAssets() {
   }).then((obj) => {
     const box = new THREE.Box3().setFromObject(obj);
     const size = box.getSize(new THREE.Vector3());
-    const k = 2.4 / Math.max(size.x, size.z, 0.001);
+    const k = 6 / Math.max(size.x, size.z, 0.001);
     obj.scale.setScalar(k);
     const c = box.getCenter(new THREE.Vector3());
     obj.position.set(-c.x * k, -c.y * k, -c.z * k);
@@ -653,10 +653,28 @@ export function createView3D(container, { onSelectPlayer } = {}) {
       }
     }
   }
-  let droneMesh = null;
+  let droneMesh = null, droneBeam = null;
   const A = loadAssets();
   A.player.then((a) => { if (disposed || !a) return; playerAsset = a; applyModels(); });
-  A.drone.then((d) => { if (disposed || !d) return; droneMesh = d.clone(); scene.add(droneMesh); });
+  A.drone.then((d) => {
+    if (disposed || !d) return;
+    droneMesh = d.clone();
+    const red = new THREE.MeshStandardMaterial({ color: 0xd50a0a, roughness: 0.35, metalness: 0.3, emissive: 0x3a0000 });
+    droneMesh.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.material = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => (/glass/i.test(m.name) ? m : red));
+    });
+    // faisceau « caméra » du drone vers le terrain + petit spot pour qu'on le repère
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(6, 1, 40, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide }));
+    beam.renderOrder = 4;
+    droneBeam = beam;
+    scene.add(droneMesh, beam);
+    const glow = new THREE.PointLight(0xff3b3b, 8, 12);
+    glow.position.y = -0.6;
+    droneMesh.add(glow);
+  });
 
   function buildRoutes() {
     const snap = snapIdx;
@@ -674,6 +692,8 @@ export function createView3D(container, { onSelectPlayer } = {}) {
       const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), Math.min(300, pts.length * 3), 0.11, 5, false),
         t.ours ? M.route : M.routeThem);
       m.renderOrder = 2;
+      m.userData.id = String(t.id);
+      m.userData.full = m.geometry.index.count;
       scene.add(m);
       routeMeshes.push(m);
     }
@@ -884,8 +904,8 @@ export function createView3D(container, { onSelectPlayer } = {}) {
         // caméra « broadcast jeu vidéo » : derrière l'attaque, en hauteur, suit le ballon
         const bx = ball && ball.visible ? ball.position.x : losX;
         const fx = Math.max(losX, Math.min(bx, losX + 25));
-        desiredPos.copy(W(fx - 13, ballSnapY * 0.6 + cy * 0.4, 9));
-        desiredTgt.copy(W(fx + 10, ballSnapY * 0.6 + cy * 0.4, 0));
+        desiredPos.copy(W(fx - 21, ballSnapY * 0.5 + cy * 0.5, 15));
+        desiredTgt.copy(W(fx + 10, ballSnapY * 0.5 + cy * 0.5, 0));
         break;
       }
       case "free":
@@ -934,8 +954,14 @@ export function createView3D(container, { onSelectPlayer } = {}) {
     for (const mx of mixers) mx.update(dt);
     if (droneMesh) {
       // le drone survole l'action : visible depuis la caméra Madden
-      droneMesh.position.set(losX + 8 + Math.sin(t * 0.25) * 2, 14 + Math.sin(t * 0.9) * 0.6, -FIELD_W / 2 + 6);
-      droneMesh.rotation.y = Math.sin(t * 0.3) * 0.3;
+      const dh = 7 + Math.sin(t * 0.9) * 0.4;
+      droneMesh.position.set(losX + 1 + Math.sin(t * 0.25) * 1.2, dh, -(ballSnapY + 5) + Math.sin(t * 0.4) * 1);
+      droneMesh.rotation.set(Math.sin(t * 0.7) * 0.05, Math.PI / 2 + Math.sin(t * 0.3) * 0.15, Math.cos(t * 0.6) * 0.05);
+      if (droneBeam) {
+        droneBeam.scale.set(1, dh - 0.3, 1);
+        droneBeam.position.set(droneMesh.position.x, (dh - 0.3) / 2, droneMesh.position.z);
+        droneBeam.material.opacity = 0.07 + Math.sin(t * 2) * 0.025;
+      }
     }
     fadeSprites();
     const w = root.clientWidth, h = root.clientHeight;
@@ -1098,6 +1124,19 @@ export function createView3D(container, { onSelectPlayer } = {}) {
   }
 
   function setDrone(b) { droneOn = !!b; }
+  // pré-tracés : dévoile progressivement la route d'un joueur (frac 0..1), ou de tous si id == null
+  function revealRoute(id, frac) {
+    for (const m of routeMeshes) {
+      if (id != null && m.userData.id !== String(id)) continue;
+      const n = Math.floor((m.userData.full * clamp(frac, 0, 1)) / 3) * 3;
+      m.geometry.setDrawRange(0, n);
+      m.visible = n > 0;
+    }
+  }
+  function focusPlayer(id) {
+    for (const p of players.values()) if (p.bub) p.bub.classList.toggle("focus", id != null && p.id === String(id));
+    bubbles.classList.toggle("has-focus", id != null);
+  }
   function getAnalysis() { return ana; }
-  return { setRep, setFrame, setSelected, setCamera, setGhost, setDrone, getAnalysis, resize, dispose };
+  return { setRep, setFrame, setSelected, setCamera, setGhost, setDrone, getAnalysis, revealRoute, focusPlayer, resize, dispose };
 }

@@ -111,6 +111,7 @@ async function loadSession(id, repId) {
 
 // ---------- Essai ----------
 function openRep(repId, { autoplay = false } = {}) {
+  if (preview) { preview.stop = true; tts.stop(); }
   const rep = state.repsById[String(repId)];
   if (!rep) return;
   if (state.view !== 'seance') setView('seance');
@@ -153,7 +154,7 @@ function setFrame(f) {
 function play() {
   if (!state.rep) return;
   if (state.frame >= state.rep.nFrames - 1.001) setFrame(0);
-  if (state.frame < 1 && state.voice && state.ana?.speech && !tts.speaking()) announceRoutes();
+  if (state.frame < 1 && state.voice && state.ana?.speech && !tts.speaking() && !preview) announceRoutes();
   state.playing = true; playTL.setPlaying(true);
 }
 function pause() { state.playing = false; playTL.setPlaying(false); }
@@ -266,6 +267,51 @@ function renderRouteCard() {
   el.hidden = false;
   el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
 }
+// Pré-tracés : avant le snap, chaque tracé se dessine sur le terrain pendant que la voix l'annonce.
+let preview = null;
+async function previewRoutes() {
+  const a = state.ana;
+  if (!a || !a.routes.length || !view3d) return;
+  if (preview) { preview.stop = true; return; }
+  const me = preview = { stop: false };
+  stopLive(); pause(); setFrame(0); tts.stop();
+  const btn = $('#previewBtn');
+  btn.classList.add('is-on'); btn.textContent = '■ Stop';
+  const items = [...$('#routeCard').querySelectorAll('li')];
+  view3d.revealRoute(null, 0);
+  const draw = (id, ms) => new Promise(res => {
+    const t0 = performance.now();
+    const tick = now => {
+      const k = Math.min(1, (now - t0) / ms);
+      view3d.revealRoute(id, 1 - Math.pow(1 - k, 3));
+      if (k < 1 && !me.stop) requestAnimationFrame(tick); else res();
+    };
+    requestAnimationFrame(tick);
+  });
+  const say = text => (state.voice ? tts.speak(text, { id: 'preview', rate: 1.05 }) : wait(1400));
+  await say(state.rep.side !== 'defense' ? 'Pré-tracés de l’attaque.' : 'Pré-tracés adverses.');
+  for (let i = 0; i < a.routes.length && !me.stop; i++) {
+    const t = a.routes[i];
+    view3d.focusPlayer(t.id);
+    items.forEach((li, k) => li.classList.toggle('speaking', k === i));
+    await Promise.all([draw(t.id, 1300), say(`${t.jersey != null ? 'Numéro ' + t.jersey : t.name}, ${t.route}. Il ${t.hint}.`)]);
+  }
+  for (let i = 0; i < a.misplaced.length && !me.stop; i++) {
+    const b = a.misplaced[i];
+    view3d.focusPlayer(b.id);
+    items.forEach((li, k) => li.classList.toggle('speaking', k === a.routes.length + i));
+    await say(`Attention, numéro ${b.jersey ?? ''}, ${b.issue}.`);
+  }
+  if (me.stop) tts.stop();
+  view3d.focusPlayer(null);
+  view3d.revealRoute(null, 1);
+  items.forEach(li => li.classList.remove('speaking'));
+  btn.classList.remove('is-on'); btn.textContent = '▶ Pré-tracés';
+  preview = null;
+  if (!me.stop) play();
+}
+$('#previewBtn').addEventListener('click', previewRoutes);
+
 function announceRoutes() {
   if (!state.ana?.speech) return;
   tts.speak(state.ana.speech, { id: 'routes', rate: 1.05 });

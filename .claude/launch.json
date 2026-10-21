@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "sideline", "runtimeExecutable": "./run.sh", "runtimeArgs": [], "port": 8080 }
+  ]
+}

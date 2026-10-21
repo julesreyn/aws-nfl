@@ -30,3 +30,5 @@
 .v3d-drone-tag i { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: rec 1.2s infinite; }
 @keyframes rec { 50% { opacity: .2; } }
 @keyframes droneIn { from { opacity: 0; transform: translateY(-10px) scale(.95); } }
+.v3d-bubbles.has-focus .v3d-bub:not(.focus) { opacity: .35; transition: opacity .3s; }
+.v3d-bub.focus { scale: 1.25; border-width: 2px; box-shadow: 0 0 0 5px rgba(250,204,21,.25), 0 8px 22px rgba(0,0,0,.4); transition: scale .3s; z-index: 2000 !important; }
