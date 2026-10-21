@@ -13,6 +13,7 @@ import type {
   ViewToggles,
 } from "@/types";
 export type { ViewToggles } from "@/types";
+import { analyzeRep, type RepAnalysis } from "@/lib/analysis";
 
 async function getJSON<T>(url: string): Promise<T> {
   const r = await fetch(url);
@@ -38,6 +39,7 @@ interface AppState {
 
   // playback / selection
   rep: Rep | null;
+  analysis: RepAnalysis | null;
   frame: number;
   playing: boolean;
   speed: number;
@@ -86,6 +88,7 @@ export const useStore = create<AppState>((set, get) => ({
   fatal: null,
 
   rep: null,
+  analysis: null,
   frame: 0,
   playing: false,
   speed: 1,
@@ -136,11 +139,14 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   openRep(repId, opts = {}) {
-    const { repsById, session, selected } = get();
+    const { repsById, session, selected, tracking } = get();
     const rep = repsById[String(repId)];
     if (!rep || !session) return;
     const nextSelected = selected && !rep.players[selected] ? null : selected;
-    set({ rep, view: "seance", selected: nextSelected, frame: 0, routes: [] });
+    const track =
+      (tracking && (tracking[String(rep.playId)] || tracking[String(rep.id)])) || null;
+    const analysis = analyzeRep(rep, track, session);
+    set({ rep, analysis, view: "seance", selected: nextSelected, frame: 0, routes: [] });
     history.replaceState(null, "", `#s=${session.id}&r=${rep.id}`);
     if (opts.autoplay) get().play();
     else get().pause();
